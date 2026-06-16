@@ -136,9 +136,9 @@ export function resolveReview(
       }
       for (const h of claimed) h.claimedBy = ch.index;
 
-      // Keep hunks in file order regardless of anchor order.
-      const ordered = parsed.hunks.filter((h) => claimed.includes(h));
-      files.push(resolvedFileFrom(parsed, ordered));
+      // Emit hunks in file order regardless of anchor order (O(H) via Set).
+      const claimedSet = new Set(claimed);
+      files.push(resolvedFileFrom(parsed, parsed.hunks.filter((h) => claimedSet.has(h))));
     }
 
     chapters.push({
