@@ -88,6 +88,18 @@ describe("HTTP server", () => {
     expect(baseSide.content).toBe("const a = 1;\nconst b = 2;\nconst c = 3;\n");
   });
 
+  test("rejects path traversal / non-review files on /api/file-content", async () => {
+    const traversal = await fetch(
+      `${server.url}api/file-content?path=${encodeURIComponent("../../../../etc/passwd")}`,
+    );
+    expect(traversal.status).toBe(403); // not in the review's file allowlist
+
+    const absolute = await fetch(
+      `${server.url}api/file-content?path=${encodeURIComponent("/etc/passwd")}`,
+    );
+    expect(absolute.status).toBe(403);
+  });
+
   test("GET / serves the placeholder viewer", async () => {
     const html = await (await fetch(server.url)).text();
     expect(html).toContain("Review Buddy");

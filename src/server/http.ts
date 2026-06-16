@@ -10,10 +10,17 @@
  * PreToolUse hook knows to return control to the agent.
  */
 import { existsSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve, sep } from "node:path";
 import type { ResolvedReview } from "../types/review.ts";
 import { fileContent } from "./git.ts";
 import { languageOf } from "./diff.ts";
+
+/** True iff `rel` resolves to a path inside `root` (blocks `..` / symlink escape). */
+function isInside(root: string, rel: string): boolean {
+  const r = resolve(root);
+  const t = resolve(root, rel);
+  return t === r || t.startsWith(r + sep);
+}
 
 export interface ServerContext {
   review: ResolvedReview;
@@ -47,6 +54,13 @@ export function startServer(ctx: ServerContext): RunningServer {
     resolveDone = res;
   });
 
+  // Only files that are actually part of this review may be fetched via
+  // /api/file-content — the tightest defense against path traversal.
+  const allowedPaths = new Set<string>();
+  for (const ch of ctx.review.chapters) {
+    for (const f of ch.files) allowedPaths.add(f.path);
+  }
+
   const server = Bun.serve({
     port: 0,
     // Max keep-alive idle (seconds). The reviewer's browser reconnects per
@@ -66,6 +80,9 @@ export function startServer(ctx: ServerContext): RunningServer {
         const path = url.searchParams.get("path");
         const side = url.searchParams.get("side") === "base" ? "base" : "head";
         if (!path) return json({ error: "missing ?path" }, 400);
+        // Allowlist (review files only) + containment guard against traversal.
+        if (!allowedPaths.has(path)) return json({ error: "unknown path" }, 403);
+        if (!isInside(ctx.cwd, path)) return json({ error: "path outside repo" }, 400);
         const content = fileContent(ctx.cwd, path, side, ctx.baseRef);
         return json({ path, side, language: languageOf(path), content });
       }
@@ -86,9 +103,12 @@ export function startServer(ctx: ServerContext): RunningServer {
 
       // Static: built UI when available, else a placeholder viewer.
       if (ctx.uiDir) {
-        const rel = pathname === "/" ? "index.html" : pathname.replace(/^\/+/, "");
+        const decoded = decodeURIComponent(pathname);
+        const rel = pathname === "/" ? "index.html" : decoded.replace(/^\/+/, "");
+        // Reject traversal before touching the filesystem.
+        const safe = !rel.split("/").includes("..") && isInside(ctx.uiDir, rel);
         const file = join(ctx.uiDir, rel);
-        if (existsSync(file)) return new Response(Bun.file(file));
+        if (safe && existsSync(file)) return new Response(Bun.file(file));
         // SPA fallback.
         const index = join(ctx.uiDir, "index.html");
         if (existsSync(index)) return new Response(Bun.file(index));
