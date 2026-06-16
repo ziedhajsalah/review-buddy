@@ -64,9 +64,17 @@ afterAll(() => {
   rmSync(dir, { recursive: true, force: true });
 });
 
+// Loopback base + token-authenticated fetch (server set in beforeAll).
+const apiUrl = (p: string) => `http://127.0.0.1:${server.port}/${p}`;
+const authed = (p: string, init: RequestInit = {}) =>
+  fetch(apiUrl(p), {
+    ...init,
+    headers: { "x-review-buddy-token": server.token, ...(init.headers ?? {}) },
+  });
+
 describe("HTTP server", () => {
   test("GET /api/review returns the resolved review with real hunk content", async () => {
-    const r = await (await fetch(`${server.url}api/review`)).json();
+    const r = await (await authed("api/review")).json();
     expect(r.meta.generatedBy).toBe("test-model");
     expect(r.pr.author).toBe("t");
     expect(r.stats.filesChanged).toBe(1);
@@ -76,31 +84,47 @@ describe("HTTP server", () => {
   });
 
   test("GET /api/file-content serves head (working tree) and base (committed) bytes", async () => {
-    const head = await (
-      await fetch(`${server.url}api/file-content?path=app.ts&side=head`)
-    ).json();
+    const head = await (await authed("api/file-content?path=app.ts&side=head")).json();
     expect(head.content).toBe("const a = 1;\nconst b = 22;\nconst c = 3;\n");
     expect(head.language).toBe("typescript");
 
-    const baseSide = await (
-      await fetch(`${server.url}api/file-content?path=app.ts&side=base`)
-    ).json();
+    const baseSide = await (await authed("api/file-content?path=app.ts&side=base")).json();
     expect(baseSide.content).toBe("const a = 1;\nconst b = 2;\nconst c = 3;\n");
   });
 
   test("rejects path traversal / non-review files on /api/file-content", async () => {
-    const traversal = await fetch(
-      `${server.url}api/file-content?path=${encodeURIComponent("../../../../etc/passwd")}`,
+    const traversal = await authed(
+      `api/file-content?path=${encodeURIComponent("../../../../etc/passwd")}`,
     );
     expect(traversal.status).toBe(403); // not in the review's file allowlist
 
-    const absolute = await fetch(
-      `${server.url}api/file-content?path=${encodeURIComponent("/etc/passwd")}`,
+    const absolute = await authed(
+      `api/file-content?path=${encodeURIComponent("/etc/passwd")}`,
     );
     expect(absolute.status).toBe(403);
   });
 
-  test("GET / serves the placeholder viewer", async () => {
+  test("requires the token on /api/* (401 without it)", async () => {
+    const res = await fetch(apiUrl("api/review")); // no token header/query
+    expect(res.status).toBe(401);
+  });
+
+  test("rejects non-loopback Host headers (DNS-rebinding guard)", async () => {
+    // curl forges the Host header (fetch forbids it). Spawn ASYNC — a sync
+    // execFileSync would block the event loop the in-process server runs on,
+    // deadlocking against its own request.
+    const proc = Bun.spawn([
+      "curl", "-s", "-o", "/dev/null", "-w", "%{http_code}",
+      "-H", "Host: evil.com",
+      "-H", `x-review-buddy-token: ${server.token}`,
+      apiUrl("api/review"),
+    ]);
+    const code = (await new Response(proc.stdout).text()).trim();
+    await proc.exited;
+    expect(code).toBe("403");
+  });
+
+  test("GET / serves the placeholder viewer (no token needed for the shell)", async () => {
     const html = await (await fetch(server.url)).text();
     expect(html).toContain("Review Buddy");
     expect(html).toContain("/api/review");
@@ -108,7 +132,7 @@ describe("HTTP server", () => {
 
   test("POST /api/done unblocks the hook", async () => {
     const res = await (
-      await fetch(`${server.url}api/done`, {
+      await authed("api/done", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ verdict: "ok" }),

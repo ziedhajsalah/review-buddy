@@ -37,10 +37,15 @@ export interface DoneResult {
 
 export interface RunningServer {
   port: number;
+  /** Per-server secret required on every /api/* request (in the browser URL). */
+  token: string;
+  /** Browser URL, loopback + token: http://127.0.0.1:<port>/?token=<token> */
   url: string;
   done: Promise<DoneResult>;
   stop: () => void;
 }
+
+const ALLOWED_HOSTS = new Set(["127.0.0.1", "localhost"]);
 
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), {
@@ -61,8 +66,11 @@ export function startServer(ctx: ServerContext): RunningServer {
     for (const f of ch.files) allowedPaths.add(f.path);
   }
 
+  const token = crypto.randomUUID();
+
   const server = Bun.serve({
     port: 0,
+    hostname: "127.0.0.1", // loopback only — never exposed on the LAN
     // Max keep-alive idle (seconds). The reviewer's browser reconnects per
     // request, so this doesn't cap the (potentially multi-day) hook block; it
     // just avoids tearing down connections mid-review. NOT 0 — in Bun, 0 closes
@@ -71,6 +79,22 @@ export function startServer(ctx: ServerContext): RunningServer {
     async fetch(req) {
       const url = new URL(req.url);
       const { pathname } = url;
+
+      // Reject non-loopback Host headers (defeats DNS rebinding: the browser
+      // sends the attacker-controlled hostname, which won't be localhost).
+      const host = (req.headers.get("host") ?? "").split(":")[0] ?? "";
+      if (!ALLOWED_HOSTS.has(host)) {
+        return json({ error: "forbidden host" }, 403);
+      }
+
+      // Sensitive data (source code, diffs) lives behind /api/* — require the
+      // per-server token. Blocks a malicious local page that scans the port
+      // but can't know the token, and CSRF on /api/done.
+      if (pathname.startsWith("/api/")) {
+        const supplied =
+          req.headers.get("x-review-buddy-token") ?? url.searchParams.get("token");
+        if (supplied !== token) return json({ error: "unauthorized" }, 401);
+      }
 
       if (pathname === "/api/review") {
         return json(ctx.review);
@@ -127,7 +151,8 @@ export function startServer(ctx: ServerContext): RunningServer {
   const port = server.port ?? 0; // assigned once listening
   return {
     port,
-    url: `http://localhost:${port}/`,
+    token,
+    url: `http://127.0.0.1:${port}/?token=${token}`,
     done,
     stop: () => server.stop(), // graceful: let any in-flight response finish
   };
@@ -168,7 +193,9 @@ function placeholderHtml(): string {
 <script type="module">
   const esc = (s) => String(s ?? "").replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
   const riskClass = (x) => (["Low","Medium","High"].includes(x) ? x : "Low");
-  const r = await (await fetch("/api/review")).json();
+  const token = new URLSearchParams(location.search).get("token") || "";
+  const authHeaders = { "x-review-buddy-token": token };
+  const r = await (await fetch("/api/review", { headers: authHeaders })).json();
   const kc = r.prologue.key_changes.map(k => '<li><b>'+esc(k.headline)+'</b> — '+esc(k.detail)+'</li>').join("");
   const chapters = r.chapters.map(c =>
     '<div class="chapter"><span class="risk '+riskClass(c.risk)+'">'+esc(c.risk)+'</span> '+
@@ -186,7 +213,7 @@ function placeholderHtml(): string {
     ' <code>'+esc(r.prologue.review_focus.file)+'</code></p>'+
     '<h2>Chapters</h2>'+chapters;
   document.getElementById("done").onclick = async () => {
-    await fetch("/api/done", { method: "POST", headers: {"content-type":"application/json"}, body: "{}" });
+    await fetch("/api/done", { method: "POST", headers: {"content-type":"application/json", ...authHeaders}, body: "{}" });
     document.body.innerHTML = "<h1>Review submitted. You can close this tab.</h1>";
   };
 </script>

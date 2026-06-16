@@ -67,25 +67,27 @@ test("open-review: stdin hook event -> serves review -> returns allow on Done", 
   proc.stdin.write(JSON.stringify(event));
   proc.stdin.end();
 
-  // Discover the ephemeral port from the stderr file.
-  let url = "";
-  for (let i = 0; i < 100 && !url; i++) {
-    const m = readFileSync(errPath, "utf8").match(/http:\/\/localhost:\d+\//);
-    if (m) url = m[0];
-    else await Bun.sleep(50);
+  // Discover the ephemeral port + token from the stderr file.
+  let m: RegExpMatchArray | null = null;
+  for (let i = 0; i < 100 && !m; i++) {
+    m = readFileSync(errPath, "utf8").match(/http:\/\/127\.0\.0\.1:(\d+)\/\?token=([\w-]+)/);
+    if (!m) await Bun.sleep(50);
   }
-  expect(url).toMatch(/^http:\/\/localhost:\d+\/$/);
+  expect(m).not.toBeNull();
+  const port = m![1]!;
+  const token = m![2]!;
+  const api = (p: string) => `http://127.0.0.1:${port}/${p}?token=${token}`;
 
   // Cross-process requests use curl (fresh connection each time). Bun's global
   // fetch pools connections to the child server and would reuse a dead socket.
   const curl = (...args: string[]) => execFileSync("curl", ["-s", ...args], { encoding: "utf8" });
 
   // Served review must carry the real hunk content (reference-not-reproduce).
-  const review = JSON.parse(curl(`${url}api/review`));
+  const review = JSON.parse(curl(api("api/review")));
   expect(review.chapters[0].files[0].hunks[0].lines).toContain("+let y = 20;");
 
   // Reviewer clicks Done -> hook unblocks and prints the allow decision.
-  curl("-X", "POST", `${url}api/done`, "-H", "content-type: application/json", "-d", "{}");
+  curl("-X", "POST", api("api/done"), "-H", "content-type: application/json", "-d", "{}");
   await proc.exited;
   closeSync(outFd);
   closeSync(errFd);
