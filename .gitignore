@@ -1,0 +1,7 @@
+node_modules/
+dist/
+*.log
+.DS_Store
+
+# build output of the bundled review UI
+src/ui/dist/

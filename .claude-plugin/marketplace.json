@@ -1,0 +1,11 @@
+{
+  "name": "review-buddy",
+  "owner": { "name": "Zied Ben Haj Salah" },
+  "plugins": [
+    {
+      "name": "review-buddy",
+      "source": ".",
+      "description": "Narrative code review: Prologue + risk-rated Chapters over a real git diff, reviewed in the browser. Run /review."
+    }
+  ]
+}

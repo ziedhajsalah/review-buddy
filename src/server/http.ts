@@ -1,0 +1,175 @@
+/**
+ * Local HTTP server for one review. Runs on an ephemeral port (Plannotator
+ * pattern) and exposes the Phase 1 endpoints:
+ *
+ *   GET  /api/review        -> the merged ResolvedReview (sources A+B+computed)
+ *   GET  /api/file-content  -> full file for expand/word-level (source C)
+ *   POST /api/done          -> reviewer closed the viewer; unblocks the hook
+ *
+ * `done` resolves when the reviewer is finished, which is how the blocking
+ * PreToolUse hook knows to return control to the agent.
+ */
+import { existsSync } from "node:fs";
+import { join } from "node:path";
+import type { ResolvedReview } from "../types/review.ts";
+import { fileContent } from "./git.ts";
+import { languageOf } from "./diff.ts";
+
+export interface ServerContext {
+  review: ResolvedReview;
+  cwd: string;
+  baseRef: string;
+  /** Directory of the built React UI (src/ui/dist). Falls back to a placeholder. */
+  uiDir?: string;
+}
+
+export interface DoneResult {
+  /** Reserved for the round-trip phase (approve / request-changes). */
+  verdict?: string;
+}
+
+export interface RunningServer {
+  port: number;
+  url: string;
+  done: Promise<DoneResult>;
+  stop: () => void;
+}
+
+const json = (data: unknown, status = 200) =>
+  new Response(JSON.stringify(data), {
+    status,
+    headers: { "content-type": "application/json" },
+  });
+
+export function startServer(ctx: ServerContext): RunningServer {
+  let resolveDone!: (r: DoneResult) => void;
+  const done = new Promise<DoneResult>((res) => {
+    resolveDone = res;
+  });
+
+  const server = Bun.serve({
+    port: 0,
+    // Max keep-alive idle (seconds). The reviewer's browser reconnects per
+    // request, so this doesn't cap the (potentially multi-day) hook block; it
+    // just avoids tearing down connections mid-review. NOT 0 — in Bun, 0 closes
+    // idle connections immediately rather than disabling the timeout.
+    idleTimeout: 240,
+    async fetch(req) {
+      const url = new URL(req.url);
+      const { pathname } = url;
+
+      if (pathname === "/api/review") {
+        return json(ctx.review);
+      }
+
+      if (pathname === "/api/file-content") {
+        const path = url.searchParams.get("path");
+        const side = url.searchParams.get("side") === "base" ? "base" : "head";
+        if (!path) return json({ error: "missing ?path" }, 400);
+        const content = fileContent(ctx.cwd, path, side, ctx.baseRef);
+        return json({ path, side, language: languageOf(path), content });
+      }
+
+      if (pathname === "/api/done" && req.method === "POST") {
+        let body: DoneResult = {};
+        try {
+          body = (await req.json()) as DoneResult;
+        } catch {
+          /* empty body is fine */
+        }
+        // Resolve on the next tick so THIS response flushes to the client
+        // before the hook tears the server down (otherwise the client sees an
+        // empty reply / connection reset).
+        setTimeout(() => resolveDone(body), 50);
+        return json({ ok: true });
+      }
+
+      // Static: built UI when available, else a placeholder viewer.
+      if (ctx.uiDir) {
+        const rel = pathname === "/" ? "index.html" : pathname.replace(/^\/+/, "");
+        const file = join(ctx.uiDir, rel);
+        if (existsSync(file)) return new Response(Bun.file(file));
+        // SPA fallback.
+        const index = join(ctx.uiDir, "index.html");
+        if (existsSync(index)) return new Response(Bun.file(index));
+      }
+
+      if (pathname === "/") {
+        return new Response(placeholderHtml(), {
+          headers: { "content-type": "text/html" },
+        });
+      }
+
+      return new Response("Not found", { status: 404 });
+    },
+  });
+
+  const port = server.port ?? 0; // assigned once listening
+  return {
+    port,
+    url: `http://localhost:${port}/`,
+    done,
+    stop: () => server.stop(), // graceful: let any in-flight response finish
+  };
+}
+
+/**
+ * Minimal stand-in for the React app so the hook->server->browser loop is
+ * testable before Phase 1 step 5 (the real viewer) is built. Fetches
+ * /api/review and renders the prologue + chapter list with a Done button.
+ */
+function placeholderHtml(): string {
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Review Buddy</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font: 15px/1.5 ui-sans-serif, system-ui, sans-serif; margin: 0; padding: 2rem;
+         max-width: 960px; margin-inline: auto; }
+  h1 { font-size: 1.4rem; } h2 { font-size: 1.1rem; margin-top: 2rem; }
+  .risk { font-size: .72rem; font-weight: 700; padding: .1rem .45rem; border-radius: 999px;
+          text-transform: uppercase; letter-spacing: .03em; }
+  .High { background:#fde2e1; color:#b42318; } .Medium { background:#fef0c7; color:#b54708; }
+  .Low { background:#dcfae6; color:#067647; }
+  .chapter { border:1px solid #e3e3e3; border-radius:10px; padding:1rem; margin:.6rem 0; }
+  .meta { color:#888; font-size:.85rem; }
+  pre { background:#f5f5f5; padding:1rem; border-radius:8px; overflow:auto; font-size:12px; }
+  button { font-size:1rem; padding:.6rem 1.4rem; border-radius:8px; border:0;
+           background:#1f6feb; color:#fff; cursor:pointer; margin-top:2rem; }
+  ul { padding-left:1.1rem; }
+</style>
+</head>
+<body>
+  <div id="app">Loading review…</div>
+  <button id="done">Done — return to agent</button>
+<script type="module">
+  const esc = (s) => String(s ?? "").replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+  const riskClass = (x) => (["Low","Medium","High"].includes(x) ? x : "Low");
+  const r = await (await fetch("/api/review")).json();
+  const kc = r.prologue.key_changes.map(k => '<li><b>'+esc(k.headline)+'</b> — '+esc(k.detail)+'</li>').join("");
+  const chapters = r.chapters.map(c =>
+    '<div class="chapter"><span class="risk '+riskClass(c.risk)+'">'+esc(c.risk)+'</span> '+
+    '<b>'+esc(c.title)+'</b> <span class="meta">+'+c.additions+' −'+c.deletions+
+    ' · '+c.fileCount+' file(s)</span><p>'+esc(c.description)+'</p></div>').join("");
+  document.getElementById("app").innerHTML =
+    '<h1>'+esc(r.pr.title)+'</h1>'+
+    '<p class="meta">'+esc(r.pr.author)+' · '+esc(r.pr.base)+' ← '+esc(r.pr.head)+
+    ' · +'+r.stats.additions+' −'+r.stats.deletions+' across '+r.stats.filesChanged+' file(s)'+
+    (r.meta.aiGenerated ? ' · <b>AI-generated</b> by '+esc(r.meta.generatedBy) : '')+'</p>'+
+    '<h2>Why</h2><p>'+esc(r.prologue.why)+'</p>'+
+    '<h2>What</h2><p>'+esc(r.prologue.what)+'</p>'+
+    '<h2>Key changes</h2><ul>'+kc+'</ul>'+
+    '<h2>Review focus</h2><p>'+esc(r.prologue.review_focus.summary)+
+    ' <code>'+esc(r.prologue.review_focus.file)+'</code></p>'+
+    '<h2>Chapters</h2>'+chapters;
+  document.getElementById("done").onclick = async () => {
+    await fetch("/api/done", { method: "POST", headers: {"content-type":"application/json"}, body: "{}" });
+    document.body.innerHTML = "<h1>Review submitted. You can close this tab.</h1>";
+  };
+</script>
+</body>
+</html>`;
+}

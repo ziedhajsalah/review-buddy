@@ -1,0 +1,17 @@
+{
+  "_comment": "Plugin hook wiring. The PreToolUse hook intercepts the custom submit_review MCP tool, captures the real diff + PR metadata, opens the review UI, and BLOCKS until the reviewer is done (long timeout = 4 days). Uses ${CLAUDE_PLUGIN_ROOT} + bun so it runs from a local --plugin-dir with no global install. PreToolUse is chosen over PermissionRequest because it always fires, even in auto-accept modes. See docs/ARCHITECTURE.md.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "mcp__review-buddy__submit_review",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun run ${CLAUDE_PLUGIN_ROOT}/src/cli/index.ts open-review",
+            "timeout": 345600
+          }
+        ]
+      }
+    ]
+  }
+}
