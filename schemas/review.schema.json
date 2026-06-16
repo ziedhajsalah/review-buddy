@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://review-buddy/schemas/review.schema.json",
+  "title": "ReviewBuddySubmitReview",
+  "description": "Input schema for the submit_review MCP tool. The AGENT contract: narrative + grouping + hunk anchors only. The tool resolves real diff content from git. See docs/review-contract.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["prologue", "chapters"],
+  "properties": {
+    "prologue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["why", "what", "key_changes", "review_focus"],
+      "properties": {
+        "why": { "type": "string", "description": "User-facing problem in plain language." },
+        "what": { "type": "string", "description": "The resolution in 1-2 sentences." },
+        "key_changes": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 5,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["headline", "detail"],
+            "properties": {
+              "headline": { "type": "string" },
+              "detail": { "type": "string" }
+            }
+          }
+        },
+        "review_focus": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["summary", "file"],
+          "properties": {
+            "summary": { "type": "string", "description": "Concrete check phrased for the reviewer." },
+            "file": { "type": "string", "description": "The single file to scrutinize most." }
+          }
+        }
+      }
+    },
+    "chapters": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["index", "title", "risk", "risk_reason", "description", "files"],
+        "properties": {
+          "index": { "type": "integer", "minimum": 1 },
+          "title": { "type": "string", "description": "Action-oriented phrase for the sub-change." },
+          "risk": { "type": "string", "enum": ["Low", "Medium", "High"] },
+          "risk_reason": { "type": "string", "description": "One-line justification for the risk rating." },
+          "additions": { "type": "integer", "minimum": 0, "description": "Advisory only; tool recomputes from real diff." },
+          "deletions": { "type": "integer", "minimum": 0, "description": "Advisory only; tool recomputes from real diff." },
+          "description": { "type": "string", "description": "2-4 sentences: what changes, technique, what to verify." },
+          "files": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["path", "change_type"],
+              "properties": {
+                "path": { "type": "string" },
+                "change_type": { "type": "string", "enum": ["added", "modified", "deleted", "renamed"] },
+                "hunks": {
+                  "type": "array",
+                  "description": "Hunk ANCHORS only. Omit entirely to mean 'the whole file belongs to this chapter'. Never include diff line content.",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["old_start", "new_start"],
+                    "properties": {
+                      "old_start": { "type": "integer", "minimum": 0 },
+                      "new_start": { "type": "integer", "minimum": 0 }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

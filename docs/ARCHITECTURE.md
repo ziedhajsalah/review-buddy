@@ -1,0 +1,94 @@
+# Architecture
+
+How the PRD's product requirements map onto a concrete, buildable system. Read `CLAUDE.md` first for the high-level decisions; this doc is the engineering detail.
+
+## Data flow
+
+```
+┌─────────────┐   /review (skill + structuring prompt)
+│ Claude Code │ ───────────────────────────────────────────┐
+│   agent     │                                             │
+└─────────────┘   agent calls submit_review(<review JSON>)  │
+        │                                                   ▼
+        │                                   ┌──────────────────────────────┐
+        │   PreToolUse hook matches         │ MCP server (review-buddy)     │
+        └─► mcp__review-buddy__submit_review │ exposes submit_review tool     │
+                                            └──────────────────────────────┘
+                                                          │
+                                  hook command (blocks the turn, long timeout)
+                                                          │
+                  ┌───────────────────────────────────────┼───────────────────────────────────────┐
+                  ▼                                         ▼                                         ▼
+        A. agent review JSON                  B. git diff + gh metadata                  C. full files (git show)
+        (prologue + chapters + anchors)       (authoritative hunks, PR desc, author)     (on demand, for expansion)
+                  └───────────────────────────────────────┴───────────────────────────────────────┘
+                                                          │
+                                          merge → start local HTTP server
+                                                          │
+                                                  open browser
+                                                          │
+                                        ┌─────────────────────────────┐
+                                        │ Prebuilt React app           │
+                                        │ GET /api/review → render     │
+                                        │ GET /api/file-content → expand│
+                                        └─────────────────────────────┘
+```
+
+## Why reference-not-reproduce (the load-bearing rule)
+
+The structuring prompt's original output format had the agent transcribe diff line content into JSON (`hunks[].lines: ["+...", "-..."]`). We rejected this:
+
+- **Correctness:** LLMs alter whitespace, drop lines, and miscount `old_start`/`new_start`. The rendered diff would silently diverge from the real code — directly violating the PRD's #1 risk ("traceable to actual diff hunks, never fabricate changes").
+- **Cost/latency:** echoing every diff line roughly doubles output tokens for zero added judgment.
+- **Capability:** "expand full file" and word-level intra-line highlighting are *impossible* from hunks alone — they need full file contents (C) and the authoritative diff (B).
+
+**Therefore:** the agent emits narrative + grouping + hunk **anchors** only. The tool parses the real `git diff` and maps hunks onto chapters by `path` + anchor. The tool computes all stats. The agent does what it is good at (judgment); git provides the bytes.
+
+## Server endpoints
+
+### Phase 1
+| Endpoint | Method | Purpose |
+|---|---|---|
+| `/api/review` | GET | The merged review: `{ meta, pr, prologue, chapters, stats }` (A + B + computed). Chapters' hunks are **resolved** here (real content from B). |
+| `/api/file-content` | GET | Full file for expansion / word-level context (`?path=&side=base\|head`). Source C. |
+| `/api/done` | POST | Reviewer closes the viewer; unblocks the hook (one-way: returns `allow`). |
+
+### Later phases
+| Endpoint | Method | Purpose |
+|---|---|---|
+| `/api/file-viewed` | POST | Persist per-file/chapter viewed state (round-trip). |
+| `/api/feedback` | POST | Submit verdict + annotations; hook returns `deny` + feedback to agent. |
+| `/api/github/*` | — | Open PR, copy branch, CI status, reviewers (via `gh`). |
+| `/api/ai/*` | — | In-context conversational assistant. |
+
+## Hook design
+
+- Plugin `hooks.json` registers a **`PreToolUse`** hook with matcher `mcp__review-buddy__submit_review` (exact MCP tool name). See `examples/hooks.json`.
+- The hook command receives the tool call on stdin: `{ tool_name, tool_input: <review JSON>, cwd, session_id, transcript_path, permission_mode }`.
+- It runs `git diff` / `gh` in `cwd` (source B), reads files on demand (C), starts the server, opens the browser, and **blocks** until `/api/done` (long timeout, e.g. `345600`).
+- **Phase 1 return:** `{ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "allow" } }` (the review was informational; let the agent proceed).
+- **Later (round-trip):** return `permissionDecision: "deny"` with the human's annotations as `permissionDecisionReason`, so the agent acts on the feedback.
+
+Why `PreToolUse` over `PermissionRequest`: `PreToolUse` always fires; `PermissionRequest` is skipped when the tool is auto-allowed by a permission rule. Both can block and modify input, but for a guaranteed gate `PreToolUse` is safer.
+
+## Validation strategy
+
+Define the `submit_review` MCP tool's `inputSchema` = `schemas/review.schema.json`. Claude Code validates the tool call against it and makes the model retry on mismatch — so malformed/truncated review JSON is caught before the hook ever runs. This is a concrete advantage of the tool-call transport over file/stdout.
+
+## Diff & rendering notes
+
+- **Parsing:** parse the unified diff from `git diff` into files → hunks (with exact `@@` headers and line numbers). Assign each hunk to a chapter by matching `path` + the agent's anchor. A hunk with no chapter match → bucket into a synthetic "Unsorted" chapter (and log it) rather than dropping it.
+- **Word-level:** compute intra-line highlights client-side by diffing each removed/added line pair (e.g. the `diff` npm package). Never expect this from the agent.
+- **Collapse / expand:** the diff view shows changed hunks + a few context lines by default; "N unmodified lines" expanders and "expand full file" call `/api/file-content`.
+- **Syntax highlighting:** derive language from the file extension (`path`); highlight client-side (highlight.js or Shiki).
+- **Multi-chapter files:** keep viewed-state keyed by `(chapterIndex, path)` if the same file appears in multiple chapters (decide in the phase that adds persistence).
+
+## Client-side state (source D)
+
+Display settings (theme, layout, granularity, wrap, line numbers, backgrounds, minimize) and — in the persistence phase — viewed flags live in the browser (cookies/localStorage), because the server runs on an ephemeral port per review (Plannotator pattern).
+
+## Performance (large PRs)
+
+- Resolve hunks lazily or paginate chapters if a PR is huge.
+- `/api/file-content` is on-demand; never inline full files into `/api/review`.
+- Consider a max-diff guard with graceful messaging.

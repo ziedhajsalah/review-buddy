@@ -1,0 +1,17 @@
+{
+  "_comment": "Example Claude Code plugin hook config. The PreToolUse hook intercepts the custom submit_review MCP tool, captures the real diff, opens the review UI, and blocks until the reviewer is done. Long timeout (345600s = 4 days) so the human is never rushed. Adjust 'command' to your built binary/script. See docs/ARCHITECTURE.md.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "mcp__review-buddy__submit_review",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "review-buddy open-review",
+            "timeout": 345600
+          }
+        ]
+      }
+    ]
+  }
+}
