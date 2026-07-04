@@ -148,11 +148,10 @@ export type DiffLayout = "unified" | "split";
 
 export interface DisplaySettings {
   layout: DiffLayout;
-  theme: string;
-  changeIndicator: string;
+  theme: "auto" | "light" | "dark";
+  changeIndicator: "classic" | "bars" | "none";
   granularity: "line" | "word";
   wrap: boolean;
   lineNumbers: boolean;
   backgrounds: boolean;
-  minimizeInline: boolean;
 }

@@ -1,0 +1,50 @@
+@import "tailwindcss";
+
+/* Design tokens — a calm, readable review surface in light and dark. */
+@theme {
+  --color-risk-high: #b42318;
+  --color-risk-high-bg: #fde2e1;
+  --color-risk-medium: #b54708;
+  --color-risk-medium-bg: #fef0c7;
+  --color-risk-low: #067647;
+  --color-risk-low-bg: #dcfae6;
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+}
+
+:root {
+  color-scheme: light dark;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+  background: var(--rb-bg);
+  color: var(--rb-fg);
+}
+
+/* Neutral surface palette, theme-aware. */
+:root {
+  --rb-bg: #ffffff;
+  --rb-fg: #1a1a1a;
+  --rb-muted: #6b7280;
+  --rb-border: #e5e7eb;
+  --rb-panel: #f9fafb;
+  --rb-accent: #1f6feb;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --rb-bg: #0d1117;
+    --rb-fg: #e6edf3;
+    --rb-muted: #8b949e;
+    --rb-border: #21262d;
+    --rb-panel: #161b22;
+    --rb-accent: #4493f8;
+  }
+}

@@ -5,3 +5,6 @@ dist/
 
 # build output of the bundled review UI
 src/ui/dist/
+
+# TS incremental build info
+*.tsbuildinfo
