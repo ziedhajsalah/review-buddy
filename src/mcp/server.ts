@@ -8,8 +8,10 @@
  * time this handler runs, the human has already seen the review, so it just
  * acks back to the agent (Phase 1, one-way).
  *
- * Registered with Claude Code as MCP server "review-buddy", which makes the
- * tool name `mcp__review-buddy__submit_review` — the hook matcher.
+ * Registered with Claude Code as MCP server "review-buddy". As a plugin-bundled
+ * server, its tool's callable name is `mcp__plugin_review-buddy_review-buddy__submit_review`
+ * (a user-configured .mcp.json server would use `mcp__review-buddy__submit_review`).
+ * The PreToolUse hook matcher in hooks/hooks.json covers both forms.
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";

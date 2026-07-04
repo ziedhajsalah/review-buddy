@@ -2,7 +2,7 @@
 name: review
 description: Turn the current working-tree diff (or a GitHub PR) into a narrative code review — a Prologue plus risk-rated, theme-grouped Chapters — and open it in the browser for a human to walk through. Run on request via /review.
 disable-model-invocation: true
-allowed-tools: Bash(git:*), Bash(gh:*), mcp__review-buddy__submit_review
+allowed-tools: Bash(git:*), Bash(gh:*), mcp__plugin_review-buddy_review-buddy__submit_review, mcp__review-buddy__submit_review
 ---
 
 # Review Buddy — structuring agent

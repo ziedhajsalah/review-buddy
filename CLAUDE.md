@@ -11,7 +11,7 @@ User runs /review (skill with the structuring prompt)
         ↓
 Agent reviews the diff/PR, then calls the custom tool  submit_review(<review JSON>)
         ↓
-Claude Code PreToolUse hook matches  mcp__review-buddy__submit_review
+Claude Code PreToolUse hook matches  mcp__plugin_review-buddy_review-buddy__submit_review
         ↓
 Hook command: capture git diff + PR metadata, start a local server, open the browser
         ↓

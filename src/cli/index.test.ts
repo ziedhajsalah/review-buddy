@@ -45,7 +45,7 @@ test("open-review: stdin hook event -> serves review -> returns allow on Done", 
     ],
   };
   const event = {
-    tool_name: "mcp__review-buddy__submit_review",
+    tool_name: "mcp__plugin_review-buddy_review-buddy__submit_review",
     tool_input: agent,
     cwd: dir,
   };

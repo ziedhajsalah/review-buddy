@@ -12,7 +12,7 @@ How the PRD's product requirements map onto a concrete, buildable system. Read `
         │                                                   ▼
         │                                   ┌──────────────────────────────┐
         │   PreToolUse hook matches         │ MCP server (review-buddy)     │
-        └─► mcp__review-buddy__submit_review │ exposes submit_review tool     │
+        └─► mcp__plugin_…__submit_review     │ exposes submit_review tool     │
                                             └──────────────────────────────┘
                                                           │
                                   hook command (blocks the turn, long timeout)
@@ -63,7 +63,7 @@ The structuring prompt's original output format had the agent transcribe diff li
 
 ## Hook design
 
-- Plugin `hooks.json` registers a **`PreToolUse`** hook with matcher `mcp__review-buddy__submit_review` (exact MCP tool name). See `examples/hooks.json`.
+- Plugin `hooks.json` registers a **`PreToolUse`** hook. A plugin-bundled MCP server names its tools `mcp__plugin_<plugin>_<server>__<tool>`, so the real tool name is `mcp__plugin_review-buddy_review-buddy__submit_review` (a user-configured `.mcp.json` server would instead use `mcp__review-buddy__submit_review`). The matcher is an alternation covering both forms. See `examples/hooks.json` and [the MCP docs](https://code.claude.com/docs/en/mcp#plugin-provided-mcp-servers).
 - The hook command receives the tool call on stdin: `{ tool_name, tool_input: <review JSON>, cwd, session_id, transcript_path, permission_mode }`.
 - It runs `git diff` / `gh` in `cwd` (source B), reads files on demand (C), starts the server, opens the browser, and **blocks** until `/api/done` (long timeout, e.g. `345600`).
 - **Phase 1 return:** `{ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "allow" } }` (the review was informational; let the agent proceed).
