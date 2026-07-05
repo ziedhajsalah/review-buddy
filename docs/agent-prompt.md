@@ -39,6 +39,8 @@ Produce a high-level orientation summary with these sections:
   specific file the reviewer should scrutinize, phrased as a concrete check
   (e.g. "Confirm fallback values correctly trigger the expected UI redirects").
 Keep it concise and skimmable. Write for a reviewer who has NOT seen the code yet.
+All prose fields render as markdown (GFM), so you may use light inline markdown —
+**bold**, `code`/symbol names, links, short lists — where it aids scanning.
 
 STEP 3 — GENERATE CHAPTERS
 Break the PR into ordered chapters. For EACH chapter output:

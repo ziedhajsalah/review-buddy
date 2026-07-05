@@ -66,6 +66,10 @@ Ordered, most foundational/highest-risk first. For each chapter:
 
 ## Critical rules
 
+- **Prose renders as markdown.** Every prose field (`why`, `what`, each `detail`,
+  `review_focus.summary`, chapter `description` / `risk_reason`) is rendered with GFM.
+  Use light inline markdown where it aids scanning — **bold**, `` `code` `` / symbol names,
+  links, and short lists. Keep it readable; don't over-format.
 - **Reference, don't reproduce.** Never copy `+`/`-`/context lines into your output. Emit
   anchors only; the tool attaches the authoritative lines from git.
 - **Never invent changes.** Every claim must trace to a real hunk.
