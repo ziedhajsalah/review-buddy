@@ -4,6 +4,7 @@ import { RiskBadge } from "./RiskBadge.tsx";
 import { DiffStat } from "./DiffStat.tsx";
 import { DisplaySettingsBar } from "./DisplaySettingsBar.tsx";
 import { FileDiffCard } from "./FileDiffCard.tsx";
+import { Markdown } from "./Markdown.tsx";
 import { useDisplaySettings } from "../settings.ts";
 import { useViewedFiles } from "../lib/viewed.ts";
 import { postDone } from "../api.ts";
@@ -138,9 +139,11 @@ export function ChapterReview({
             <span className="font-semibold" style={{ color: "var(--rb-fg)" }}>
               Risk:{" "}
             </span>
-            {chapter.risk_reason}
+            <Markdown value={chapter.risk_reason} variant="inline" className="inline" />
           </p>
-          <p className="mt-3 text-sm leading-relaxed">{chapter.description}</p>
+          <div className="mt-3 text-sm">
+            <Markdown value={chapter.description} />
+          </div>
 
           <h2 className="mt-5 mb-2 text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--rb-muted)" }}>
             {chapter.files.length} file{chapter.files.length === 1 ? "" : "s"}
@@ -174,7 +177,7 @@ export function ChapterReview({
         <div className="flex min-w-0 flex-1 flex-col">
           <DisplaySettingsBar settings={settings} update={updateSettings} />
           <div ref={diffScrollRef} className="min-h-0 flex-1 overflow-y-auto p-4">
-            <div className="mx-auto flex max-w-5xl flex-col gap-4">
+            <div className="flex w-full flex-col gap-4">
               {files.map((f) => (
                 <div key={f.path} data-file-path={f.path}>
                   <FileDiffCard

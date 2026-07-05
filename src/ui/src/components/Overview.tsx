@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { ResolvedReview } from "../../../types/review.ts";
 import { RiskBadge } from "./RiskBadge.tsx";
 import { DiffStat } from "./DiffStat.tsx";
+import { Markdown } from "./Markdown.tsx";
 
 type Tab = "prologue" | "description";
 
@@ -55,24 +56,27 @@ export function Overview({
       {tab === "prologue" ? (
         <section className="space-y-5">
           <Block heading="Why">
-            <p>{prologue.why}</p>
+            <Markdown value={prologue.why} />
           </Block>
           <Block heading="What">
-            <p>{prologue.what}</p>
+            <Markdown value={prologue.what} />
           </Block>
           <Block heading="Key changes">
             <ul className="space-y-1.5">
               {prologue.key_changes.map((k, i) => (
                 <li key={i} className="leading-relaxed">
                   <span className="font-semibold">{k.headline}</span>
-                  <span style={{ color: "var(--rb-muted)" }}> — {k.detail}</span>
+                  <span style={{ color: "var(--rb-muted)" }}>
+                    {" — "}
+                    <Markdown value={k.detail} variant="inline" className="inline" />
+                  </span>
                 </li>
               ))}
             </ul>
           </Block>
           <Block heading="Review focus">
             <p>
-              {prologue.review_focus.summary}{" "}
+              <Markdown value={prologue.review_focus.summary} variant="inline" className="inline" />{" "}
               <code
                 className="rounded px-1.5 py-0.5 font-mono text-xs"
                 style={{ background: "var(--rb-panel)" }}
@@ -85,9 +89,7 @@ export function Overview({
       ) : (
         <section>
           {pr.description ? (
-            <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed">
-              {pr.description}
-            </pre>
+            <Markdown value={pr.description} className="text-sm" />
           ) : (
             <p style={{ color: "var(--rb-muted)" }}>No PR description available.</p>
           )}
@@ -122,7 +124,7 @@ export function Overview({
                 </div>
               </div>
               <p className="mt-2 line-clamp-2 text-sm" style={{ color: "var(--rb-muted)" }}>
-                {ch.description}
+                <Markdown value={ch.description} variant="inline" className="inline" />
               </p>
             </button>
           </li>
