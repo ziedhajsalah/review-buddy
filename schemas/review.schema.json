@@ -7,6 +7,23 @@
   "additionalProperties": false,
   "required": ["prologue", "chapters"],
   "properties": {
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "What was reviewed, so the hook re-captures the SAME diff. Omit for the local working tree.",
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["worktree", "pr", "branch"],
+          "description": "'worktree' = uncommitted changes vs HEAD (default); 'pr' = a GitHub PR (hook runs `gh pr diff <ref>`); 'branch' = changes vs a base ref (hook runs `git diff <ref>`)."
+        },
+        "ref": {
+          "type": "string",
+          "description": "PR number or URL when type='pr'; base ref (e.g. 'main') when type='branch'. Omit for 'worktree'."
+        }
+      }
+    },
     "prologue": {
       "type": "object",
       "additionalProperties": false,

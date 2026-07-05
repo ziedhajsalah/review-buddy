@@ -14,7 +14,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { AgentReview, ReviewMeta } from "../types/review.ts";
-import { captureDiff, capturePr, resolveBase } from "../server/git.ts";
+import { assertSafeRef, captureDiff, capturePr, capturePrDiff, resolveBase } from "../server/git.ts";
 import { resolveReview } from "../server/resolve.ts";
 import { startServer } from "../server/http.ts";
 import { openBrowser } from "../server/browser.ts";
@@ -55,10 +55,36 @@ function allow(reason: string): never {
   process.exit(0);
 }
 
+/**
+ * Capture the authoritative diff (source B) matching what the agent reviewed.
+ * `agent.source` tells us which — the hook can't see `/review`'s arguments, so
+ * without this a PR review would re-capture the local working tree (empty) and
+ * render no hunks. `base` is the ref used for full-file expansion (source C).
+ */
+function captureForSource(
+  agent: AgentReview,
+  cwd: string,
+): { diff: string; pr: ReturnType<typeof capturePr>; base: string } {
+  const source = agent.source ?? { type: "worktree" };
+
+  if (source.type === "pr" && source.ref) {
+    const pr = capturePr(cwd, "HEAD", source.ref);
+    // Base side of expansion uses the PR's base branch (may be a fetched ref).
+    return { diff: capturePrDiff(cwd, source.ref), pr, base: pr.base };
+  }
+
+  let base: string;
+  if (source.type === "branch" && source.ref) {
+    assertSafeRef(source.ref); // ref flows into `git diff <ref>` — block flag smuggling
+    base = source.ref;
+  } else {
+    base = resolveBase(cwd, process.env.REVIEW_BUDDY_BASE);
+  }
+  return { diff: captureDiff(cwd, base), pr: capturePr(cwd, base), base };
+}
+
 async function serveAndBlock(agent: AgentReview, cwd: string): Promise<void> {
-  const base = resolveBase(cwd, process.env.REVIEW_BUDDY_BASE);
-  const diff = captureDiff(cwd, base);
-  const pr = capturePr(cwd, base);
+  const { diff, pr, base } = captureForSource(agent, cwd);
   const { review, warnings } = resolveReview(agent, diff, buildMeta(), pr);
   for (const w of warnings) console.error(`[review-buddy] ${w}`);
 

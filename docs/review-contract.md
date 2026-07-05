@@ -13,6 +13,7 @@ Types for both live in `src/types/review.ts`.
 
 ```jsonc
 {
+  "source": { "type": "pr", "ref": "42" },  // what to re-capture; omit ⇒ working tree
   "prologue": {
     "why": "Users on the free tier saw a blank dashboard when no sport was selected.",
     "what": "Adds null-safe sport selectors with a sensible default and redirect.",
@@ -51,6 +52,7 @@ Types for both live in `src/types/review.ts`.
 ```
 
 **Rules**
+- `source` tells the hook which diff to re-capture, since it never sees `/review`'s arguments: `{ "type": "worktree" }` (default — uncommitted vs HEAD), `{ "type": "pr", "ref": "<n|url>" }` (hook runs `gh pr diff <ref>`), or `{ "type": "branch", "ref": "<base>" }` (hook runs `git diff <ref>`). **Required for PR/branch reviews** — omitting it makes the hook fall back to the local working tree and the viewer renders an empty diff.
 - `hunks` entries are anchors only (`old_start`, `new_start`) — match the `@@` header numbers from the diff the agent was given.
 - Omit `hunks` for a file ⇒ "all hunks of this file belong here."
 - A file may appear in multiple chapters with different hunk anchors.

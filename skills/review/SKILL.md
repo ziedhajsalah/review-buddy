@@ -14,13 +14,19 @@ reproduce diff line content.
 
 ## Step 0 — Gather the diff
 
-Determine what to review from `$ARGUMENTS`:
+Determine what to review from `$ARGUMENTS`. **Remember which**, because in Step 4
+you must tell the tool via `source` so the hook re-captures the *same* diff (the
+hook never sees `$ARGUMENTS` — only your `submit_review` payload):
 
-- **No arguments** → review the local working tree. Run:
+- **No arguments** → review the local working tree; `source = { "type": "worktree" }`. Run:
   - `git diff` — tracked changes (the hook captures the same, so your anchors line up)
   - `git status --short` — note any untracked files (new files the diff above may not show)
   - For each untracked file you intend to include, `git diff --no-index -- /dev/null <file>` to see it as a new-file diff.
-- **A PR number or URL** → run `gh pr diff <arg>` and `gh pr view <arg>` for the diff and metadata.
+- **A PR number or URL** → `source = { "type": "pr", "ref": "<arg>" }`. Run `gh pr diff <arg>`
+  and `gh pr view <arg>` for the diff and metadata. **The `ref` is load-bearing** — the hook
+  runs `gh pr diff <ref>` to get the authoritative hunks; without it the viewer is empty.
+- **A base branch/ref** (e.g. reviewing a whole branch vs `main`) → `source = { "type": "branch", "ref": "<base>" }`.
+  Run `git diff <base>` for the diff; the hook re-captures with the same base.
 
 Read **every** hunk. Each hunk header is `@@ -old_start,old_count +new_start,new_count @@` — the
 `old_start` / `new_start` are the anchors you will reference.
@@ -68,6 +74,9 @@ Ordered, most foundational/highest-risk first. For each chapter:
 
 ## Step 4 — Submit
 
-Call **`submit_review`** with `{ prologue, chapters }` matching the schema. Calling it opens
-the review in the reviewer's browser and pauses for their review. When control returns,
+Call **`submit_review`** with `{ source, prologue, chapters }` matching the schema — where
+`source` is the object you determined in Step 0 (`worktree` / `pr` / `branch`). This is how
+the hook knows which diff to re-capture; for a PR it is REQUIRED (omitting it makes the hook
+fall back to the local working tree, and the viewer shows an empty diff). Calling the tool
+opens the review in the reviewer's browser and pauses for their review. When control returns,
 briefly acknowledge and continue.

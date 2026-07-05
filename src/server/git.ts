@@ -32,6 +32,27 @@ function run(
 const git = (cwd: string, args: string[], allowFail = false) =>
   run("git", cwd, ["--no-pager", ...args], allowFail);
 
+/**
+ * Guard against argv flag smuggling: `ref` originates in the agent's JSON (and,
+ * for a PR, ultimately from untrusted branch/PR data). execFileSync blocks shell
+ * injection but NOT a value like `--upload-pack=…` being read as a flag by git/gh.
+ * A safe git ref can't start with `-`; a PR ref must be a bare number or a
+ * github.com pull URL.
+ */
+const PR_REF_RE = /^(\d+|https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/pull\/\d+)$/;
+
+export function assertSafeRef(ref: string): void {
+  if (!ref || ref.startsWith("-")) {
+    throw new Error(`Refusing unsafe git ref: ${JSON.stringify(ref)}`);
+  }
+}
+
+export function assertPrRef(ref: string): void {
+  if (!PR_REF_RE.test(ref)) {
+    throw new Error(`Refusing unsafe PR ref (want a number or github PR URL): ${JSON.stringify(ref)}`);
+  }
+}
+
 /** Resolve the diff base ref: explicit override, else HEAD, else empty tree. */
 export function resolveBase(cwd: string, override?: string): string {
   if (override) return override;
@@ -63,6 +84,18 @@ export function captureDiff(cwd: string, base: string): string {
   return tracked + sep + untracked;
 }
 
+/**
+ * The PR's diff via `gh pr diff <ref>` (ref = number, URL, or branch). Use this
+ * — NOT `git diff` — when the agent reviewed a PR: the PR branch usually isn't
+ * checked out locally, so a local `git diff` would be empty or unrelated. Throws
+ * if gh is missing/unauthenticated or the PR can't be found (the caller fails
+ * open, so the agent isn't blocked).
+ */
+export function capturePrDiff(cwd: string, ref: string): string {
+  assertPrRef(ref);
+  return run("gh", cwd, ["pr", "diff", ref], false);
+}
+
 interface GhPr {
   title?: string;
   body?: string;
@@ -76,17 +109,19 @@ interface GhPr {
 /**
  * PR metadata (source B). Prefers `gh pr view` when a PR exists; otherwise
  * falls back to local git (branch name + last commit subject) so the
- * working-tree flow works with no GitHub remote.
+ * working-tree flow works with no GitHub remote. Pass `ref` (PR number/URL)
+ * to target a specific PR — required when the branch isn't checked out.
  */
-export function capturePr(cwd: string, base: string): PrMetadata {
+export function capturePr(cwd: string, base: string, ref?: string): PrMetadata {
   const branch = git(cwd, ["rev-parse", "--abbrev-ref", "HEAD"], true).trim() || "HEAD";
 
-  const ghJson = run(
-    "gh",
-    cwd,
-    ["pr", "view", "--json", "title,body,author,createdAt,baseRefName,headRefName,url"],
-    true,
-  ).trim();
+  const ghArgs = ["pr", "view"];
+  if (ref) {
+    assertPrRef(ref);
+    ghArgs.push(ref);
+  }
+  ghArgs.push("--json", "title,body,author,createdAt,baseRefName,headRefName,url");
+  const ghJson = run("gh", cwd, ghArgs, true).trim();
 
   if (ghJson.startsWith("{")) {
     try {

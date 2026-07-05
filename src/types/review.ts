@@ -64,10 +64,27 @@ export interface AgentChapter {
   files: AgentReviewFile[];
 }
 
+/**
+ * What the agent reviewed, so the hook can re-capture the SAME authoritative
+ * diff (the hook never sees `/review`'s arguments — only this payload + cwd):
+ *  - worktree: uncommitted changes vs HEAD (the default).
+ *  - pr:       a GitHub PR — the hook runs `gh pr diff <ref>`.
+ *  - branch:   changes vs a base ref — the hook runs `git diff <ref>`.
+ * Omit ⇒ worktree (back-compat).
+ */
+export type ReviewSourceType = "worktree" | "pr" | "branch";
+export interface ReviewSource {
+  type: ReviewSourceType;
+  /** PR number/URL for `pr`; base ref for `branch`. Unused for `worktree`. */
+  ref?: string;
+}
+
 /** Exactly what the agent emits via submit_review. */
 export interface AgentReview {
   prologue: Prologue;
   chapters: AgentChapter[];
+  /** How to capture the diff (see ReviewSource). Omit ⇒ worktree. */
+  source?: ReviewSource;
 }
 
 /* ------------------------------------------------------------------ */
