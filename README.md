@@ -57,14 +57,16 @@ Restart Claude Code (or reload plugins) if prompted, so the MCP server and hook 
 
 ### Use it
 
-From a repo with uncommitted changes (or a checked-out PR branch), in Claude Code:
+From any repo, in Claude Code:
 
 ```text
-/review              # review the current working-tree diff
-/review 42           # review GitHub PR #42 (requires gh)
+/review              # review the current working-tree diff (uncommitted changes)
+/review 42           # review GitHub PR #42 — via `gh pr diff`, no checkout needed
 ```
 
-The agent reads the diff, writes the Prologue + Chapters, and a browser tab opens with the review. Claude Code blocks until you click **Done** in the tab.
+The agent tells the hook what it reviewed (working tree vs PR) so the hook captures the *same* diff — you don't have to check the PR branch out. The agent then reads the diff, writes the Prologue + Chapters, and a browser tab opens with the review; Claude Code blocks until you click **Done** in the tab.
+
+> For a PR whose branch isn't checked out, the diff renders fully, but "expand full file" may be empty (those bytes aren't on disk).
 
 ### Update / uninstall
 
