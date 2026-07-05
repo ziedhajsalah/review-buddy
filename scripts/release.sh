@@ -15,6 +15,8 @@
 # - commits the bump on develop
 # - fast-forwards main to the release commit and tags it v<version> (annotated)
 # - pushes develop, main, and the tag to origin in one atomic push
+# - creates a GitHub Release for the tag with auto-generated notes (if gh is
+#   installed and authenticated; skipped with --no-github or when unavailable)
 #
 # Release model:
 # This repo is linear — work lands on develop and main trails as a
@@ -30,6 +32,7 @@
 #   ./scripts/release.sh 1.0.0                 # explicit version
 #   ./scripts/release.sh minor --dry-run       # preview, change nothing
 #   ./scripts/release.sh patch --yes           # skip the confirmation prompt
+#   ./scripts/release.sh patch --no-github     # tag only, no GitHub Release
 
 set -euo pipefail
 
@@ -46,6 +49,7 @@ trap 'echo ""; echo -e "  ${RED}✘ Command failed at line $LINENO: $BASH_COMMAN
 
 DRY_RUN=false
 SKIP_CONFIRM=false
+USE_GITHUB=true
 
 # Resolve the repo root from the script location so it works from anywhere.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -103,9 +107,10 @@ show_usage() {
   echo "  X.Y.Z                    Set an explicit semver version"
   echo ""
   echo "Options:"
-  echo "  -n, --dry-run   Print the release steps without changing anything"
-  echo "  -y, --yes       Skip the confirmation prompt"
-  echo "  -h, --help      Show this help message"
+  echo "  -n, --dry-run    Print the release steps without changing anything"
+  echo "  -y, --yes        Skip the confirmation prompt"
+  echo "      --no-github  Push the tag only; do not create a GitHub Release"
+  echo "  -h, --help       Show this help message"
   echo ""
   echo "This script will:"
   echo "  1. Verify the tree is clean, on develop, in sync with origin, main fast-forwardable"
@@ -113,6 +118,7 @@ show_usage() {
   echo "  3. Verify every file agrees, then commit on develop"
   echo "  4. Fast-forward main to the release commit and tag it v<version>"
   echo "  5. Push develop, main, and the tag to origin"
+  echo "  6. Create a GitHub Release for the tag with auto-generated notes"
 }
 
 require_command() {
@@ -121,6 +127,12 @@ require_command() {
     log_error "Required command not found: $command_name"
     exit 1
   fi
+}
+
+# True when a GitHub Release can be created: gh is installed and authenticated.
+# gh resolves the repo from the origin remote itself, so we only gate on auth.
+github_available() {
+  command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1
 }
 
 # ---------------------------------------------------------------------------
@@ -179,6 +191,7 @@ main() {
     case "$1" in
       -n|--dry-run) DRY_RUN=true ;;
       -y|--yes) SKIP_CONFIRM=true ;;
+      --no-github) USE_GITHUB=false ;;
       -h|--help) show_usage; exit 0 ;;
       --)
         shift
@@ -302,6 +315,13 @@ main() {
     step "Fast-forward ${master_branch} to the release commit"
     step "Tag ${tag_name} (annotated)"
     step "Push ${develop_branch}, ${master_branch}, and ${tag_name} to origin"
+    if [ "$USE_GITHUB" = false ]; then
+      step "Skip GitHub Release (--no-github)"
+    elif github_available; then
+      step "Create GitHub Release ${tag_name} (--generate-notes)"
+    else
+      step "Skip GitHub Release (gh not installed or not authenticated)"
+    fi
   else
     for f in "${VERSION_FILES[@]}"; do
       write_version_to "$f" "$version"
@@ -331,6 +351,18 @@ main() {
 
     git push origin "$develop_branch" "$master_branch" "refs/tags/$tag_name" --quiet
     step "Push ${develop_branch}, ${master_branch}, and ${tag_name} to origin"
+
+    # The git release is already pushed, so a GitHub hiccup here must not abort
+    # the run — create the Release best-effort and warn (don't exit) on failure.
+    if [ "$USE_GITHUB" = false ]; then
+      echo -e "  ${YELLOW}○ Skipped GitHub Release (--no-github)${NC}"
+    elif ! github_available; then
+      echo -e "  ${YELLOW}○ Skipped GitHub Release — gh not installed or not authenticated${NC}"
+    elif release_url="$(gh release create "$tag_name" --title "$tag_name" --generate-notes --verify-tag --latest 2>/dev/null)"; then
+      step "Create GitHub Release ${tag_name}"
+    else
+      echo -e "  ${YELLOW}⚠ GitHub Release not created — run: gh release create ${tag_name} --generate-notes${NC}"
+    fi
   fi
 
   # -- Summary --------------------------------------------------------------
@@ -349,6 +381,9 @@ main() {
     echo -e "  ${GREEN}Release ${tag_name} completed${NC}"
     echo -e "  Branches pushed: ${develop_branch}, ${master_branch}"
     echo -e "  Tag: ${tag_name}"
+    if [ -n "${release_url:-}" ]; then
+      echo -e "  GitHub Release: ${release_url}"
+    fi
     echo -e "  ${YELLOW}Note:${NC} the README status line is prose — update it by hand if this release changes what's shipped."
   fi
   echo ""
