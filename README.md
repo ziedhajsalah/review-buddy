@@ -93,7 +93,11 @@ examples/hooks.json  # example Claude Code plugin hook config
 
 Backend runs on [Bun](https://bun.sh); the viewer is a separate Vite package.
 
+`bun run verify` is the fast local loop (tests + both typechecks); `bun run verify:ci` is the exact gate CI runs on every pull request and on pushes to `main`/`develop` (it adds the UI production build). Run `bun run verify:ci` before opening a PR. Note that `verify` assumes deps are already installed in both packages (run the `bun install` steps first).
+
 ```bash
+bun run verify         # fast local loop: backend tests + backend & UI typechecks
+bun run verify:ci      # full gate CI runs: verify + UI production build
 bun install            # backend deps
 bun test               # backend tests
 bun run typecheck      # backend tsc
