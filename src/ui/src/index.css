@@ -36,6 +36,12 @@ body {
   --rb-border: #e5e7eb;
   --rb-panel: #f9fafb;
   --rb-accent: #1f6feb;
+
+  /* Inline `code` — a distinct pill that stands apart from prose:
+     tinted fill, firm border, and a saturated ink so it never reads as grey. */
+  --rb-code-fg: #b3187a;
+  --rb-code-bg: #f4eef7;
+  --rb-code-border: #e3d4ea;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -46,5 +52,9 @@ body {
     --rb-border: #21262d;
     --rb-panel: #161b22;
     --rb-accent: #4493f8;
+
+    --rb-code-fg: #f6a4d8;
+    --rb-code-bg: #24202b;
+    --rb-code-border: #3a3145;
   }
 }

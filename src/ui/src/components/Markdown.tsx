@@ -65,7 +65,11 @@ const code: Components["code"] = ({ className, children }) => {
   return (
     <code
       className="rounded px-1.5 py-0.5 font-mono text-[0.85em]"
-      style={{ background: "var(--rb-panel)" }}
+      style={{
+        color: "var(--rb-code-fg)",
+        background: "var(--rb-code-bg)",
+        border: "1px solid var(--rb-code-border)",
+      }}
     >
       {children}
     </code>
