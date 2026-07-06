@@ -4,6 +4,7 @@
   "private": true,
   "description": "AI-assisted narrative code review for Claude Code — Prologue + risk-rated Chapters over a real git diff.",
   "type": "module",
+  "packageManager": "bun@1.3.5",
   "bin": {
     "review-buddy": "bin/review-buddy.js"
   },
@@ -11,7 +12,11 @@
     "mcp": "bun run src/mcp/server.ts",
     "hook": "bun run src/cli/index.ts",
     "test": "bun test",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "typecheck:ui": "bun run --cwd src/ui typecheck",
+    "build:ui": "bun run --cwd src/ui build",
+    "verify": "bun run test && bun run typecheck && bun run typecheck:ui",
+    "verify:ci": "bun run test && bun run typecheck && bun run build:ui"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.0",
