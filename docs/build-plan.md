@@ -1,58 +1,81 @@
 # Build Plan
 
-Start here in a fresh session. Read `CLAUDE.md` and `docs/ARCHITECTURE.md` first.
+Phase 1 is shipped. This file is the shipped/deferred ledger: the stack
+that was chosen, what Phase 1 delivered, and what's deferred to Phases 2–4. For
+orientation read `CLAUDE.md` and `docs/ARCHITECTURE.md`; for install/dev see
+`README.md`.
 
-## Proposed stack (confirm before scaffolding)
+## Stack (chosen and shipped)
 
-- **Runtime:** Bun (matches the Plannotator reference; gives a fast single binary for the hook command). Node + tsx is a fine alternative.
-- **MCP server:** `@modelcontextprotocol/sdk` (TypeScript) exposing one tool, `submit_review`, with `inputSchema` = `schemas/review.schema.json`.
-- **UI:** React + Vite + Tailwind. Bundle to a single self-contained HTML via `vite-plugin-singlefile` (later optimization; a normal Vite build served by the local server is fine to start).
-- **Diff parsing:** parse `git diff` ourselves, or use a library (e.g. `parse-diff`). Word-level highlighting via the `diff` package. Syntax highlighting via highlight.js or Shiki.
-- **HTTP server:** Bun.serve (or node:http) for `/api/*`.
+- **Runtime:** Bun — the MCP server and the `PreToolUse` hook both run on it.
+- **MCP server:** `@modelcontextprotocol/sdk` (TypeScript) exposing one tool,
+  `submit_review`, whose `inputSchema` is `schemas/review.schema.json`.
+- **UI:** React 19 + Vite + Tailwind v4; diffs via `@pierre/diffs` with syntax
+  highlighting by Shiki (`shiki-js`). A single self-contained HTML bundle
+  (`vite-plugin-singlefile`) is still deferred — see Open questions.
+- **Diff parsing:** we parse `git diff` ourselves (`src/server/`); word-level
+  intra-line highlighting is done client-side by `@pierre/diffs`.
+- **HTTP server:** `Bun.serve` for `/api/*` — loopback-only bind with a
+  per-server token.
 
-> These are recommendations, not yet locked. Confirm with the owner, then create `package.json`, `tsconfig.json`, and the Vite config.
+## Phase 1 — One-way narrative viewer ✅ shipped
 
-## Phase 1 — One-way narrative viewer (build this first)
+Goal (met): agent → `submit_review` → hook → browser renders Prologue +
+Chapters + diffs. No round-trip.
 
-Goal: agent → `submit_review` → hook → browser renders Prologue + Chapters + diffs. No round-trip.
+1. ✅ **MCP server + tool.** The `review-buddy` MCP server exposes
+   `submit_review` (schema-validated); registered as a Claude Code plugin server.
+2. ✅ **`/review` skill.** `skills/review/SKILL.md` is the structuring prompt
+   (`disable-model-invocation: true`; runs on request). It instructs the agent
+   to analyze the diff and call `submit_review` — including the load-bearing
+   `source` field so the hook re-captures the same diff.
+3. ✅ **Hook command (`open-review`, `src/cli/index.ts`).** On the `PreToolUse`
+   interception: read the agent JSON from stdin; in `cwd` capture `git diff`
+   (source B) + PR metadata (`gh` when available); parse the diff into files →
+   hunks and **resolve** chapters by matching agent anchors, bucketing unclaimed
+   hunks into "Unsorted changes"; recompute stats; start the local server, open
+   the browser, and **block** until `POST /api/done`.
+4. ✅ **Server endpoints.** `GET /api/review`, `GET /api/file-content`,
+   `POST /api/done`.
+5. ✅ **React app.** Prologue/Description overview (AI badge + `meta`, risk-rated
+   chapter cards); split-pane chapter review (context panel + filterable
+   chapter-scoped file tree + diff pane); diff viewer with unified/split, display
+   settings (theme, indicator, granularity incl. word-level, wrap, line numbers,
+   backgrounds, minimize), "N unmodified lines" collapse, and per-file controls
+   (collapse, copy filename, mark viewed locally); display prefs + viewed flags
+   persisted client-side.
+6. ✅ **End-to-end** against real diffs — resolved hunks match `git diff`
+   exactly (the point of reference-not-reproduce).
 
-1. **MCP server + tool.** Stand up the `review-buddy` MCP server exposing `submit_review` (schema-validated). Register it for Claude Code.
-2. **`/review` skill.** A skill whose body is `docs/agent-prompt.md`, instructing the agent to analyze the diff and call `submit_review`. (`disable-model-invocation: true` so it only runs on request.)
-3. **Hook command (`open-review`).** On the `PreToolUse` interception:
-   - Read tool input (agent JSON) from stdin.
-   - In `cwd`: capture `git diff` (source B) and PR metadata (`gh pr view --json ...` when available; otherwise branch/diff stats).
-   - Parse the diff into files → hunks; **resolve** chapters by matching agent anchors (`docs/review-contract.md` §resolution). Bucket unclaimed hunks into "Unsorted changes".
-   - Compute stats; attach `meta` + `pr`.
-   - Start the local HTTP server, open the browser, **block** until `POST /api/done`.
-   - Return `{ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "allow" } }`.
-4. **Server endpoints.** `GET /api/review`, `GET /api/file-content`, `POST /api/done`.
-5. **React app.**
-   - **Overview screen:** tabs `AI Prologue` (prologue) / `Description` (pr.description); AI-generated badge + `meta`; chapter list cards (title, risk badge, +/- stats, file count); "Begin review".
-   - **Chapter review (split-pane):** left context panel (title, risk badge + reason, stats, description, filterable file tree scoped to chapter); right diff pane.
-   - **Diff viewer:** unified/split, display settings (theme, indicator, granularity incl. word-level, wrap, line numbers, backgrounds, minimize), collapse "N unmodified lines" + expand full file (via `/api/file-content`), per-file controls (collapse, copy filename, expand, mark viewed locally).
-   - **State:** display settings + local viewed flags in cookies/localStorage.
-6. **End-to-end test** with a real PR. Verify resolved diffs match `git diff` exactly (the whole point of reference-not-reproduce).
+Deferred within Phase 1: "expand full file" — the backend serves
+`/api/file-content`, but the viewer wiring is a later phase.
 
 ## Phase 2 — Progress & round-trip
 
-- Persist viewed state (files/chapters) → `POST /api/file-viewed`; reflect in chapter list.
-- Verdict submission: `POST /api/feedback`; hook returns `permissionDecision: "deny"` with annotations as `permissionDecisionReason` so the agent acts on feedback. "Collapse all files" control.
+- Persist viewed state (files/chapters) → `POST /api/file-viewed`; reflect in
+  the chapter list.
+- Verdict submission: `POST /api/feedback`; hook returns
+  `permissionDecision: "deny"` with annotations as `permissionDecisionReason`
+  so the agent acts on feedback. "Collapse all files" control.
 
 ## Phase 3 — Collaboration & integration
 
-- GitHub: open PR, copy branch, author/open-time/base/head/CI via `gh`. Activity view, Chat, add reviewers, draft/status indicator.
+- GitHub: open PR, copy branch, author/open-time/base/head/CI via `gh`. Activity
+  view, Chat, add reviewers, draft/status indicator.
 
 ## Phase 4 — Conversational assistant
 
 - In-context AI agent (`/api/ai/*`) for questions within the PR context.
 
-## Open questions to settle with the owner
+## Open questions (still open)
 
-- Stack confirmation (Bun vs Node; Shiki vs highlight.js).
-- Diff base: PR three-dot (`base...head`) vs working-tree diff vs both (a "diff type" switcher like Plannotator).
-- Viewed-state key when a file spans multiple chapters: per `(chapter, file)` or global per file.
-- Distribution: Claude Code plugin/marketplace vs local `--plugin-dir`.
-- Single-file HTML now or later.
+- **Single-file HTML / prebuilt distribution:** ship the viewer as one
+  self-contained HTML (`vite-plugin-singlefile`) and/or prebuilt, so install can
+  skip the `bun run build` step.
+
+Settled since planning: stack = Bun + `@pierre/diffs`/Shiki; distribution =
+Claude Code plugin marketplace; diff base = worktree/pr/branch `source` routing;
+viewed-state key = per `(chapter, file)`.
 
 ## Reference files in Plannotator (`~/code/plannotator`)
 
