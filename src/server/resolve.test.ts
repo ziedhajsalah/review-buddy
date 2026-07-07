@@ -137,3 +137,150 @@ describe("resolveReview", () => {
     expect(review.stats).toEqual({ additions: 6, deletions: 3, filesChanged: 4 });
   });
 });
+
+describe("resolveReview — fidelity", () => {
+  const RENAME_SECTION = `diff --git a/old-name.ts b/new-name.ts
+similarity index 90%
+rename from old-name.ts
+rename to new-name.ts
+index 5555555..6666666 100644
+--- a/old-name.ts
++++ b/new-name.ts
+@@ -1,2 +1,2 @@
+-a
++b
+ c
+`;
+
+  test("all anchors miss => no empty chapter entry; hunks land in Unsorted", () => {
+    const agent: AgentReview = {
+      prologue: AGENT.prologue,
+      chapters: [
+        {
+          index: 1,
+          title: "Missed anchors",
+          risk: "Low",
+          risk_reason: "test",
+          description: "anchors do not match",
+          files: [
+            {
+              path: "src/dashboard/useSport.ts",
+              change_type: "modified",
+              hunks: [{ old_start: 999, new_start: 999 }],
+            },
+          ],
+        },
+      ],
+    };
+    const { review, warnings } = resolveReview(agent, SAMPLE, META, PR);
+
+    const ch1 = review.chapters.find((c) => c.index === 1);
+    expect(ch1).toBeDefined();
+    expect(ch1!.fileCount).toBe(0);
+    expect(ch1!.files.some((f) => f.path === "src/dashboard/useSport.ts")).toBe(false);
+
+    const unsorted = review.chapters.find((c) => c.title === "Unsorted changes");
+    expect(unsorted).toBeDefined();
+    const sport = unsorted!.files.find((f) => f.path === "src/dashboard/useSport.ts");
+    expect(sport).toBeDefined();
+    expect(sport!.hunks).toHaveLength(2);
+
+    expect(warnings.some((w) => w.includes("none of the anchors"))).toBe(true);
+  });
+
+  test("binary file carry-through => binary flag, no Unsorted duplicate", () => {
+    const agent: AgentReview = {
+      prologue: AGENT.prologue,
+      chapters: [
+        {
+          index: 1,
+          title: "Logo",
+          risk: "Low",
+          risk_reason: "binary asset",
+          description: "logo update",
+          files: [{ path: "logo.png", change_type: "modified" }],
+        },
+      ],
+    };
+    const { review } = resolveReview(agent, SAMPLE, META, PR);
+
+    const ch1 = review.chapters.find((c) => c.index === 1);
+    expect(ch1).toBeDefined();
+    const logo = ch1!.files.find((f) => f.path === "logo.png");
+    expect(logo).toBeDefined();
+    expect(logo!.binary).toBe(true);
+    expect(logo!.hunks).toHaveLength(0);
+
+    const unsorted = review.chapters.find((c) => c.title === "Unsorted changes");
+    expect(unsorted?.files.some((f) => f.path === "logo.png") ?? false).toBe(false);
+  });
+
+  test("rename carry-through => old_path on resolved file", () => {
+    const agent: AgentReview = {
+      prologue: AGENT.prologue,
+      chapters: [
+        {
+          index: 1,
+          title: "Rename",
+          risk: "Low",
+          risk_reason: "file rename",
+          description: "renamed file",
+          files: [{ path: "new-name.ts", change_type: "renamed" }],
+        },
+      ],
+    };
+    const { review } = resolveReview(agent, SAMPLE + RENAME_SECTION, META, PR);
+
+    const ch1 = review.chapters.find((c) => c.index === 1);
+    expect(ch1).toBeDefined();
+    const renamed = ch1!.files.find((f) => f.path === "new-name.ts");
+    expect(renamed).toBeDefined();
+    expect(renamed!.change_type).toBe("renamed");
+    expect(renamed!.old_path).toBe("old-name.ts");
+  });
+
+  test("partial anchor miss => file in both the chapter and Unsorted", () => {
+    const agent: AgentReview = {
+      prologue: AGENT.prologue,
+      chapters: [
+        {
+          index: 1,
+          title: "Partial",
+          risk: "Low",
+          risk_reason: "one anchor hits, one misses",
+          description: "partial anchor match",
+          files: [
+            {
+              path: "src/dashboard/useSport.ts",
+              change_type: "modified",
+              // first anchor matches the @@ -12 hunk; second matches nothing
+              hunks: [
+                { old_start: 12, new_start: 12 },
+                { old_start: 999, new_start: 999 },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    const { review, warnings } = resolveReview(agent, SAMPLE, META, PR);
+
+    // Chapter keeps the one matched hunk.
+    const ch1 = review.chapters.find((c) => c.index === 1);
+    expect(ch1).toBeDefined();
+    const inChapter = ch1!.files.find((f) => f.path === "src/dashboard/useSport.ts");
+    expect(inChapter).toBeDefined();
+    expect(inChapter!.hunks).toHaveLength(1);
+
+    // The unmatched hunk still lands in Unsorted under the SAME path.
+    const unsorted = review.chapters.find((c) => c.title === "Unsorted changes");
+    expect(unsorted).toBeDefined();
+    const inUnsorted = unsorted!.files.find((f) => f.path === "src/dashboard/useSport.ts");
+    expect(inUnsorted).toBeDefined();
+    expect(inUnsorted!.hunks).toHaveLength(1);
+
+    // Partial miss => per-anchor warning fires, but NOT the total-miss summary.
+    expect(warnings.some((w) => w.includes("(old 999, new 999)"))).toBe(true);
+    expect(warnings.some((w) => w.includes("none of the anchors"))).toBe(false);
+  });
+});

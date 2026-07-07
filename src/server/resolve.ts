@@ -53,6 +53,8 @@ function resolvedFileFrom(file: ParsedFile, hunks: ParsedHunk[]): ResolvedFile {
     deletions: hunks.reduce((n, h) => n + h.deletions, 0),
     language: languageOf(file.path),
     hunks: hunks.map(toResolvedHunk),
+    ...(file.binary ? { binary: true } : {}),
+    ...(file.oldPath ? { old_path: file.oldPath } : {}),
   };
 }
 
@@ -115,7 +117,6 @@ export function resolveReview(
         warnings.push(`Chapter ${ch.index}: file "${af.path}" not found in the diff — skipped.`);
         continue;
       }
-      referenced.add(parsed);
 
       let claimed: ParsedHunk[];
       if (!af.hunks || af.hunks.length === 0) {
@@ -135,6 +136,16 @@ export function resolveReview(
         }
       }
       for (const h of claimed) h.claimedBy = ch.index;
+
+      const anchored = !!af.hunks && af.hunks.length > 0;
+      if (anchored && claimed.length === 0) {
+        warnings.push(
+          `Chapter ${ch.index}: none of the anchors for "${af.path}" matched — ` +
+            `its changes will appear under "Unsorted changes".`,
+        );
+        continue; // no empty entry; unclaimed hunks fall through to Unsorted
+      }
+      referenced.add(parsed);
 
       // Emit hunks in file order regardless of anchor order (O(H) via Set).
       const claimedSet = new Set(claimed);
