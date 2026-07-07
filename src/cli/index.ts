@@ -14,7 +14,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { AgentReview, ReviewMeta } from "../types/review.ts";
-import { assertSafeRef, captureDiff, capturePr, capturePrDiff, resolveBase } from "../server/git.ts";
+import { assertSafeRef, captureDiff, capturePr, capturePrDiff, ensureCommit, prBaseRef, resolveBase } from "../server/git.ts";
 import { resolveReview } from "../server/resolve.ts";
 import { startServer } from "../server/http.ts";
 import { openBrowser } from "../server/browser.ts";
@@ -64,13 +64,20 @@ function allow(reason: string): never {
 function captureForSource(
   agent: AgentReview,
   cwd: string,
-): { diff: string; pr: ReturnType<typeof capturePr>; base: string } {
+): { diff: string; pr: ReturnType<typeof capturePr>; base: string; headRef?: string | null } {
   const source = agent.source ?? { type: "worktree" };
 
   if (source.type === "pr" && source.ref) {
     const pr = capturePr(cwd, "HEAD", source.ref);
-    // Base side of expansion uses the PR's base branch (may be a fetched ref).
-    return { diff: capturePrDiff(cwd, source.ref), pr, base: pr.base };
+    // The PR's reviewed state is a commit, not the local working tree. Fetch it
+    // once (at hook startup, not per-request); null = unavailable, in which case
+    // full-file expansion is disabled rather than leaking worktree bytes.
+    const headRef =
+      pr.headRefOid && ensureCommit(cwd, pr.headRefOid, source.ref) ? pr.headRefOid : null;
+    // Base side: merge-base of the PR head and its base branch when we have the
+    // head SHA; otherwise keep the base branch name.
+    const base = typeof headRef === "string" ? prBaseRef(cwd, headRef, pr.base) : pr.base;
+    return { diff: capturePrDiff(cwd, source.ref), pr, base, headRef };
   }
 
   let base: string;
@@ -84,11 +91,14 @@ function captureForSource(
 }
 
 async function serveAndBlock(agent: AgentReview, cwd: string): Promise<void> {
-  const { diff, pr, base } = captureForSource(agent, cwd);
+  const { diff, pr, base, headRef } = captureForSource(agent, cwd);
   const { review, warnings } = resolveReview(agent, diff, buildMeta(), pr);
   for (const w of warnings) console.error(`[review-buddy] ${w}`);
+  if (headRef === null) {
+    console.error("[review-buddy] PR head not fetchable — full-file expansion disabled.");
+  }
 
-  const server = startServer({ review, cwd, baseRef: base, uiDir: uiDir() });
+  const server = startServer({ review, cwd, baseRef: base, headRef, uiDir: uiDir() });
   console.error(`[review-buddy] Review ready at ${server.url}`);
   if (process.env.REVIEW_BUDDY_NO_OPEN) {
     console.error(`[review-buddy] REVIEW_BUDDY_NO_OPEN set — not opening a browser.`);
