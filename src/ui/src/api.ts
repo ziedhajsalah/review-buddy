@@ -3,6 +3,7 @@
  * put in the browser URL (?token=...). The server rejects /api/* without it.
  */
 import type { ResolvedReview } from "../../types/review.ts";
+import { parseReview } from "./lib/reviewSchema.ts";
 import { authHeaders } from "./session.ts";
 
 async function getJSON<T>(path: string): Promise<T> {
@@ -13,8 +14,9 @@ async function getJSON<T>(path: string): Promise<T> {
   return (await res.json()) as T;
 }
 
-export function fetchReview(): Promise<ResolvedReview> {
-  return getJSON<ResolvedReview>("/api/review");
+export async function fetchReview(): Promise<ResolvedReview> {
+  const data = await getJSON<unknown>("/api/review");
+  return parseReview(data);
 }
 
 export async function postDone(verdict?: string): Promise<void> {
