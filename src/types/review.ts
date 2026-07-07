@@ -128,6 +128,10 @@ export interface ResolvedFile {
   deletions: number;     // tool-computed
   language: string;      // derived from extension
   hunks: ResolvedHunk[]; // resolved from B, scoped to this chapter
+  /** True for binary files (no text hunks). From the real diff, not the agent. */
+  binary?: boolean;
+  /** Pre-rename path when change_type === "renamed". */
+  old_path?: string;
 }
 
 export interface ResolvedChapter {
