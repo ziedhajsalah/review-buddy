@@ -42,8 +42,13 @@ const TOOL_DESCRIPTION = [
   "in the reviewer's browser.",
 ].join(" ");
 
+// Version comes from package.json so release.sh's bump covers this too —
+// a hardcoded string here was the one version site the release script missed.
+const pkgPath = join(import.meta.dir, "..", "..", "package.json");
+const pkg = JSON.parse(readFileSync(pkgPath, "utf8")) as { version?: string };
+
 const server = new Server(
-  { name: "review-buddy", version: "0.1.0" },
+  { name: "review-buddy", version: pkg.version ?? "0.0.0" },
   { capabilities: { tools: {} } },
 );
 
