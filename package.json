@@ -11,12 +11,13 @@
   "scripts": {
     "mcp": "bun run src/mcp/server.ts",
     "hook": "bun run src/cli/index.ts",
-    "test": "bun test",
+    "test": "bun test src/server src/cli src/mcp",
+    "test:ui": "bun run --cwd src/ui test",
     "typecheck": "tsc --noEmit",
     "typecheck:ui": "bun run --cwd src/ui typecheck",
     "build:ui": "bun run --cwd src/ui build",
-    "verify": "bun run test && bun run typecheck && bun run typecheck:ui",
-    "verify:ci": "bun run test && bun run typecheck && bun run build:ui"
+    "verify": "bun run test && bun run typecheck && bun run typecheck:ui && bun run test:ui",
+    "verify:ci": "bun run test && bun run typecheck && bun run build:ui && bun run test:ui"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.0",

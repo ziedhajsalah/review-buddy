@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 
 export type StorageBackend = "cookie" | "local";
 
-function parseStored<T>(raw: string | null, initial: T): T {
+export function parseStored<T>(raw: string | null, initial: T): T {
   if (!raw) return initial;
   try {
     const parsed = JSON.parse(raw) as unknown;

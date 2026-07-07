@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AgentReview, PrMetadata, ReviewMeta } from "../types/review.ts";
@@ -179,6 +179,108 @@ describe("HTTP server", () => {
     expect(res.ok).toBe(true);
     const done = await server.done;
     expect(done.verdict).toBe("ok");
+  });
+
+  function startUiServer(uiDir: string): RunningServer {
+    const agent: AgentReview = {
+      prologue: {
+        why: "w",
+        what: "x",
+        key_changes: [
+          { headline: "h1", detail: "d1" },
+          { headline: "h2", detail: "d2" },
+        ],
+        review_focus: { summary: "s", file: "app.ts" },
+      },
+      chapters: [
+        {
+          index: 1,
+          title: "Tweak b",
+          risk: "Low",
+          risk_reason: "trivial",
+          description: "changes b",
+          files: [{ path: "app.ts", change_type: "modified" }],
+        },
+      ],
+    };
+    const pr: PrMetadata = capturePr(dir, base);
+    const { review } = resolveReview(agent, captureDiff(dir, base), META, pr);
+    return startServer({ review, cwd: dir, baseRef: base, uiDir });
+  }
+
+  test("serves index and assets from uiDir", async () => {
+    const parent = mkdtempSync(join(tmpdir(), "rb-ui-parent-"));
+    const uiDir = join(parent, "ui");
+    mkdirSync(join(uiDir, "assets"), { recursive: true });
+    writeFileSync(join(uiDir, "index.html"), "<html>UI</html>");
+    writeFileSync(join(uiDir, "assets", "app.js"), "console.log('app')");
+    const s = startUiServer(uiDir);
+    try {
+      const index = await (await fetch(`http://127.0.0.1:${s.port}/`)).text();
+      expect(index).toContain("UI");
+
+      const asset = await fetch(`http://127.0.0.1:${s.port}/assets/app.js`);
+      expect(asset.status).toBe(200);
+      expect(await asset.text()).toContain("console.log('app')");
+    } finally {
+      s.stop();
+      rmSync(parent, { recursive: true, force: true });
+    }
+  });
+
+  test("SPA fallback serves index.html for unknown routes", async () => {
+    const parent = mkdtempSync(join(tmpdir(), "rb-ui-parent-"));
+    const uiDir = join(parent, "ui");
+    mkdirSync(uiDir, { recursive: true });
+    writeFileSync(join(uiDir, "index.html"), "<html>UI</html>");
+    const s = startUiServer(uiDir);
+    try {
+      const res = await fetch(`http://127.0.0.1:${s.port}/nonexistent`);
+      expect(res.status).toBe(200);
+      expect(await res.text()).toContain("UI");
+    } finally {
+      s.stop();
+      rmSync(parent, { recursive: true, force: true });
+    }
+  });
+
+  test("static serving never escapes uiDir via traversal", async () => {
+    const parent = mkdtempSync(join(tmpdir(), "rb-ui-parent-"));
+    const uiDir = join(parent, "ui");
+    mkdirSync(uiDir, { recursive: true });
+    writeFileSync(join(uiDir, "index.html"), "<html>UI</html>");
+    writeFileSync(join(parent, "secret.txt"), "TOPSECRET");
+    const s = startUiServer(uiDir);
+    try {
+      const curlBody = async (path: string) => {
+        const proc = Bun.spawn([
+          "curl", "-s", "--path-as-is",
+          `http://127.0.0.1:${s.port}${path}`,
+        ]);
+        const body = await new Response(proc.stdout).text();
+        await proc.exited;
+        return body;
+      };
+
+      const passwd = await curlBody("/../../../../etc/passwd");
+      expect(passwd).not.toContain("TOPSECRET");
+      expect(passwd).toContain("UI");
+
+      const encoded = await curlBody("/..%2f..%2fsecret.txt");
+      expect(encoded).not.toContain("TOPSECRET");
+      expect(encoded).toContain("UI");
+
+      // One level up resolves to <parent>/secret.txt — the real sentinel.
+      // WITHOUT the guard, join(uiDir, "../secret.txt") exists and would be
+      // served; WITH it, the ".." segment forces the SPA fallback. This is the
+      // assertion that actually fails if containment breaks.
+      const oneUp = await curlBody("/..%2fsecret.txt");
+      expect(oneUp).not.toContain("TOPSECRET");
+      expect(oneUp).toContain("UI");
+    } finally {
+      s.stop();
+      rmSync(parent, { recursive: true, force: true });
+    }
   });
 
   test("malformed percent-encoding yields 404, not a 500", async () => {
