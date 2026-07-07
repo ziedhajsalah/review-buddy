@@ -29,8 +29,11 @@ function run(
   }
 }
 
+// core.quotePath=false is global on purpose: every path this module reads from
+// git (diff, ls-files, show, log) must arrive as raw UTF-8, never C-quoted, so
+// special-character filenames survive capture. Do not narrow it to one call.
 const git = (cwd: string, args: string[], allowFail = false) =>
-  run("git", cwd, ["--no-pager", ...args], allowFail);
+  run("git", cwd, ["--no-pager", "-c", "core.quotePath=false", ...args], allowFail);
 
 /**
  * Guard against argv flag smuggling: `ref` originates in the agent's JSON (and,
@@ -69,9 +72,10 @@ export function resolveBase(cwd: string, override?: string): string {
 export function captureDiff(cwd: string, base: string): string {
   const tracked = git(cwd, ["diff", "--no-color", base]);
 
-  const others = git(cwd, ["ls-files", "--others", "--exclude-standard"])
-    .split("\n")
-    .map((s) => s.trim())
+  // -z = NUL-terminated raw paths: no C-quoting of special characters, so the
+  // exact on-disk name reaches `git diff --no-index` below.
+  const others = git(cwd, ["ls-files", "-z", "--others", "--exclude-standard"])
+    .split("\0")
     .filter(Boolean);
 
   let untracked = "";
