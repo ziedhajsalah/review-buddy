@@ -140,6 +140,67 @@ describe("resolveReview", () => {
   });
 });
 
+describe("resolveReview — index normalization", () => {
+  const TWO_HUNK_DIFF = `diff --git a/multi.ts b/multi.ts
+index 1111111..2222222 100644
+--- a/multi.ts
++++ b/multi.ts
+@@ -1,3 +1,4 @@
+ a
+-b
++b1
+ c
+@@ -10,3 +11,4 @@
+ x
+-y
++y1
+ z
+`;
+
+  test("duplicate chapter indices normalize to 1..N and claim distinct hunks", () => {
+    const agent: AgentReview = {
+      prologue: AGENT.prologue,
+      chapters: [
+        {
+          index: 7,
+          title: "First hunk",
+          risk: "Low",
+          risk_reason: "test",
+          description: "claims first hunk",
+          files: [
+            {
+              path: "multi.ts",
+              change_type: "modified",
+              hunks: [{ old_start: 1, new_start: 1 }],
+            },
+          ],
+        },
+        {
+          index: 7,
+          title: "Second hunk",
+          risk: "Low",
+          risk_reason: "test",
+          description: "claims second hunk",
+          files: [
+            {
+              path: "multi.ts",
+              change_type: "modified",
+              hunks: [{ old_start: 10, new_start: 10 }],
+            },
+          ],
+        },
+      ],
+    };
+    const { review, warnings } = resolveReview(agent, TWO_HUNK_DIFF, META, PR);
+
+    expect(review.chapters[0]!.index).toBe(1);
+    expect(review.chapters[1]!.index).toBe(2);
+    expect(review.chapters[0]!.files[0]!.hunks[0]!.old_start).toBe(1);
+    expect(review.chapters[1]!.files[0]!.hunks[0]!.old_start).toBe(10);
+    expect(warnings.some((w) => w.includes("normalized to"))).toBe(true);
+  });
+});
+
 describe("resolveReview — fidelity", () => {
   const RENAME_SECTION = `diff --git a/old-name.ts b/new-name.ts
 similarity index 90%

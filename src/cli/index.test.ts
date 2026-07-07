@@ -161,3 +161,57 @@ test("open-review: source.type=branch captures the diff against the given base r
   closeSync(outFd);
   closeSync(errFd);
 }, 20_000);
+
+test("open-review: invalid chapter index fails open without starting server", async () => {
+  const agent: AgentReview = {
+    prologue: {
+      why: "y is wrong",
+      what: "fix y and add z",
+      key_changes: [
+        { headline: "Fix y", detail: "20 not 2" },
+        { headline: "Add z", detail: "new binding" },
+      ],
+      review_focus: { summary: "check z is used", file: "app.ts" },
+    },
+    chapters: [
+      {
+        index: -1,
+        title: "Adjust bindings",
+        risk: "Low",
+        risk_reason: "tiny",
+        description: "edits y and adds z",
+        files: [{ path: "app.ts", change_type: "modified" }],
+      },
+    ],
+  };
+  const event = {
+    tool_name: "mcp__plugin_review-buddy_review-buddy__submit_review",
+    tool_input: agent,
+    cwd: dir,
+  };
+
+  const outPath = join(tmpdir(), `rb-cli-out3-${process.pid}.txt`);
+  const errPath = join(tmpdir(), `rb-cli-err3-${process.pid}.txt`);
+  const outFd = openSync(outPath, "w");
+  const errFd = openSync(errPath, "w");
+
+  const proc = Bun.spawn(["bun", "run", join(import.meta.dir, "index.ts"), "open-review"], {
+    cwd: dir,
+    env: { ...process.env, REVIEW_BUDDY_NO_OPEN: "1" },
+    stdin: "pipe",
+    stdout: outFd,
+    stderr: errFd,
+  });
+  proc.stdin.write(JSON.stringify(event));
+  proc.stdin.end();
+
+  await proc.exited;
+  closeSync(outFd);
+  closeSync(errFd);
+
+  const decision = JSON.parse(readFileSync(outPath, "utf8"));
+  expect(decision.hookSpecificOutput.permissionDecision).toBe("allow");
+  const err = readFileSync(errPath, "utf8");
+  expect(err).toContain("Invalid review payload");
+  expect(err).not.toContain("Review ready at");
+}, 20_000);

@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parseDiff } from "./diff.ts";
-import { assertPrRef, assertSafeRef, captureDiff, capturePrDiff, ensureCommit, fileContent } from "./git.ts";
+import { assertPrRef, assertSafeRef, captureDiff, capturePrDiff, ensureCommit, fileContent, resolveBase } from "./git.ts";
 
 test("assertSafeRef rejects flag-smuggling refs, accepts real refs", () => {
   expect(() => assertSafeRef("-O/tmp/x")).toThrow();
@@ -13,6 +13,14 @@ test("assertSafeRef rejects flag-smuggling refs, accepts real refs", () => {
   expect(() => assertSafeRef("main")).not.toThrow();
   expect(() => assertSafeRef("origin/feature-x")).not.toThrow();
   expect(() => assertSafeRef("HEAD~1")).not.toThrow();
+});
+
+test("resolveBase rejects a flag-smuggling override before git runs", () => {
+  expect(() => resolveBase(".", "--upload-pack=x")).toThrow();
+});
+
+test("fileContent rejects an unsafe base ref before git runs", () => {
+  expect(() => fileContent(".", "f", "base", "-Oevil")).toThrow();
 });
 
 test("assertPrRef accepts a number or github PR URL, rejects the rest", () => {
