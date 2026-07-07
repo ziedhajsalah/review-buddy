@@ -27,7 +27,11 @@ export interface ParsedHunk {
 }
 
 export interface ParsedFile {
-  /** Canonical path: the head/new path, or the old path for deletions. */
+  /**
+   * Canonical path: the head/new path, or the old path for deletions. Always a
+   * fully-decoded on-disk path — no git C-quoting, no `a/`/`b/` prefix, and no
+   * `---`/`+++` tab terminator (see unquotePath / stripPrefix / headerPath).
+   */
   path: string;
   /** Present for renames (the pre-rename path). */
   oldPath?: string;
@@ -57,6 +61,20 @@ function unquotePath(p: string): string {
     }
   }
   return p;
+}
+
+/**
+ * Extract the path from a `---`/`+++` header body (the text after "--- ").
+ * git appends a TAB — then an optional timestamp — as a field terminator
+ * when the filename contains a space (e.g. `+++ b/with space.ts\t`). Strip
+ * that terminator BEFORE unquoting: a C-quoted name encodes an interior tab
+ * as the two literal chars `\t` (not a real 0x09), so cutting at the first
+ * real tab removes only git's separator and never truncates an escaped name.
+ */
+function headerPath(seg: string): string {
+  const tab = seg.indexOf("\t");
+  const raw = tab === -1 ? seg : seg.slice(0, tab);
+  return unquotePath(stripPrefix(raw));
 }
 
 function finalizeFile(file: ParsedFile): void {
@@ -141,10 +159,10 @@ export function parseDiff(raw: string): ParsedFile[] {
     } else if (line.startsWith("Binary files ") || line.startsWith("GIT binary patch")) {
       file.binary = true;
     } else if (line.startsWith("--- ")) {
-      const p = unquotePath(stripPrefix(line.slice(4)));
+      const p = headerPath(line.slice(4));
       if (p !== "/dev/null" && !file.oldPath) file.oldPath = p;
     } else if (line.startsWith("+++ ")) {
-      const p = unquotePath(stripPrefix(line.slice(4)));
+      const p = headerPath(line.slice(4));
       if (p !== "/dev/null") file.path = p;
     } else {
       const m = HUNK_HEADER.exec(line);

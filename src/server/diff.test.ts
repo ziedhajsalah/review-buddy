@@ -120,6 +120,32 @@ describe("parseDiff", () => {
     expect(f.binary).toBe(true);
     expect(f.hunks).toHaveLength(0);
   });
+
+  test("strips git's trailing-tab terminator from spaced filenames", () => {
+    const diff = `diff --git a/with space.ts b/with space.ts
+new file mode 100644
+index 0000000..9495c3c
+--- /dev/null
++++ b/with space.ts\t
+@@ -0,0 +1 @@
++space
+`;
+    expect(parseDiff(diff).map((f) => f.path)).toEqual(["with space.ts"]);
+  });
+
+  test("strips the trailing-tab terminator on the --- line of a modified spaced file", () => {
+    const diff = `diff --git a/with space.ts b/with space.ts
+index 1111111..2222222 100644
+--- a/with space.ts\t
++++ b/with space.ts\t
+@@ -1 +1 @@
+-old
++new
+`;
+    const f = parseDiff(diff)[0]!;
+    expect(f.path).toBe("with space.ts");
+    expect(f.oldPath).toBe("with space.ts");
+  });
 });
 
 describe("languageOf", () => {
