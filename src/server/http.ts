@@ -1,8 +1,9 @@
 /**
  * Local HTTP server for one review. Runs on an ephemeral port (Plannotator
- * pattern) and exposes the Phase 1 endpoints:
+ * pattern) and exposes its endpoints:
  *
  *   GET  /api/review        -> the merged ResolvedReview (sources A+B+computed)
+ *   GET  /api/config        -> { roundtrip } — REVIEW_BUDDY_ROUNDTRIP flag for the client
  *   GET  /api/file-content  -> full file for expand/word-level (source C)
  *   POST /api/done          -> reviewer closed the viewer; unblocks the hook
  *
@@ -35,11 +36,15 @@ export interface ServerContext {
   headRef?: string | null;
   /** Directory of the built React UI (src/ui/dist). Falls back to a placeholder. */
   uiDir?: string;
+  /** Phase 2 spike: REVIEW_BUDDY_ROUNDTRIP — exposes the verdict UI via /api/config. */
+  roundtrip?: boolean;
 }
 
 export interface DoneResult {
-  /** Reserved for the round-trip phase (approve / request-changes). */
-  verdict?: string;
+  /** Round-trip verdict. Absent/other ⇒ treated as approve (fail-open). */
+  verdict?: "approve" | "request_changes";
+  /** Reviewer's overall note when requesting changes (markdown). */
+  summary?: string;
 }
 
 export interface RunningServer {
@@ -116,6 +121,10 @@ export function startServer(ctx: ServerContext): RunningServer {
 
       if (pathname === "/api/review") {
         return json(ctx.review);
+      }
+
+      if (pathname === "/api/config") {
+        return json({ roundtrip: ctx.roundtrip ?? false });
       }
 
       if (pathname === "/api/file-content") {

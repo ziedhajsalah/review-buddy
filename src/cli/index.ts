@@ -6,7 +6,9 @@
  *                          from stdin, captures the diff + PR (sources B/C),
  *                          resolves the agent review (A), serves it, opens the
  *                          browser, and BLOCKS until the reviewer clicks Done.
- *                          Phase 1: always returns permissionDecision "allow".
+ *                          Returns permissionDecision "allow" (Phase 1); with
+ *                          REVIEW_BUDDY_ROUNDTRIP set, a "request changes"
+ *                          verdict returns "deny" + the reviewer's note (Phase 2 spike).
  *   dev --review <file>    Load an agent review JSON from a file and run the
  *                          same viewer against the current repo — for testing
  *                          the UI without going through the agent/hook.
@@ -16,7 +18,7 @@ import { join } from "node:path";
 import type { AgentReview, ReviewMeta } from "../types/review.ts";
 import { assertSafeRef, captureDiff, capturePr, capturePrDiff, ensureCommit, prBaseRef, resolveBase } from "../server/git.ts";
 import { resolveReview } from "../server/resolve.ts";
-import { startServer } from "../server/http.ts";
+import { startServer, type DoneResult } from "../server/http.ts";
 import { openBrowser } from "../server/browser.ts";
 import { validateAgentReview } from "./validate.ts";
 
@@ -49,6 +51,20 @@ function allow(reason: string): never {
       hookSpecificOutput: {
         hookEventName: "PreToolUse",
         permissionDecision: "allow",
+        permissionDecisionReason: reason,
+      },
+    }) + "\n",
+  );
+  process.exit(0);
+}
+
+/** Print the PreToolUse deny decision and exit (Phase 2 round-trip spike). */
+function deny(reason: string): never {
+  process.stdout.write(
+    JSON.stringify({
+      hookSpecificOutput: {
+        hookEventName: "PreToolUse",
+        permissionDecision: "deny",
         permissionDecisionReason: reason,
       },
     }) + "\n",
@@ -91,7 +107,7 @@ function captureForSource(
   return { diff: captureDiff(cwd, base), pr: capturePr(cwd, base), base };
 }
 
-async function serveAndBlock(agent: AgentReview, cwd: string): Promise<void> {
+async function serveAndBlock(agent: AgentReview, cwd: string): Promise<DoneResult> {
   const { diff, pr, base, headRef } = captureForSource(agent, cwd);
   const { review, warnings } = resolveReview(agent, diff, buildMeta(), pr);
   for (const w of warnings) console.error(`[review-buddy] ${w}`);
@@ -99,7 +115,14 @@ async function serveAndBlock(agent: AgentReview, cwd: string): Promise<void> {
     console.error("[review-buddy] PR head not fetchable — full-file expansion disabled.");
   }
 
-  const server = startServer({ review, cwd, baseRef: base, headRef, uiDir: uiDir() });
+  const server = startServer({
+    review,
+    cwd,
+    baseRef: base,
+    headRef,
+    uiDir: uiDir(),
+    roundtrip: !!process.env.REVIEW_BUDDY_ROUNDTRIP,
+  });
   console.error(`[review-buddy] Review ready at ${server.url}`);
   if (process.env.REVIEW_BUDDY_NO_OPEN) {
     console.error(`[review-buddy] REVIEW_BUDDY_NO_OPEN set — not opening a browser.`);
@@ -107,8 +130,9 @@ async function serveAndBlock(agent: AgentReview, cwd: string): Promise<void> {
     console.error(`[review-buddy] Could not open a browser — open the URL above manually.`);
   }
 
-  await server.done;
+  const result = await server.done;
   server.stop();
+  return result;
 }
 
 async function runOpenReview(): Promise<never> {
@@ -129,11 +153,20 @@ async function runOpenReview(): Promise<never> {
     allow("Review Buddy received no valid review payload; proceeding.");
   }
 
+  let result: DoneResult;
   try {
-    await serveAndBlock(agent as AgentReview, cwd);
+    result = await serveAndBlock(agent as AgentReview, cwd);
   } catch (err) {
     console.error(`[review-buddy] Viewer error: ${String(err)}`);
     allow("Review Buddy hit an error rendering the review; proceeding.");
+  }
+  if (process.env.REVIEW_BUDDY_ROUNDTRIP && result.verdict === "request_changes") {
+    const note = result.summary?.trim();
+    deny(
+      note
+        ? `Reviewer requested changes:\n\n${note}`
+        : "Reviewer requested changes (no details provided) — re-examine the flagged chapters.",
+    );
   }
   allow("Review viewed by the human.");
 }

@@ -7,7 +7,7 @@ import { FileDiffCard } from "./FileDiffCard.tsx";
 import { Markdown } from "./Markdown.tsx";
 import { useDisplaySettings } from "../settings.ts";
 import { useViewedFiles, clearViewedFiles } from "../lib/viewed.ts";
-import { postDone } from "../api.ts";
+import { postDone, fetchConfig } from "../api.ts";
 
 export function ChapterReview({
   review,
@@ -32,9 +32,17 @@ export function ChapterReview({
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [roundtrip, setRoundtrip] = useState(false);
+  const [requesting, setRequesting] = useState(false); // textarea open
+  const [summary, setSummary] = useState("");
   const diffScrollRef = useRef<HTMLDivElement>(null);
 
   const chapter = chapters[position];
+
+  // Verdict UI is gated by REVIEW_BUDDY_ROUNDTRIP; the server exposes it via /api/config.
+  useEffect(() => {
+    fetchConfig().then((c) => setRoundtrip(c.roundtrip)).catch(() => {});
+  }, []);
 
   // Scroll the diff pane to top and reset file filter whenever the chapter changes.
   useEffect(() => {
@@ -63,7 +71,21 @@ export function ChapterReview({
     setSubmitting(true);
     setSubmitError(null);
     try {
-      await postDone();
+      await postDone(roundtrip ? { verdict: "approve" } : undefined);
+      clearViewedFiles();
+      setSubmitted(true);
+    } catch (e) {
+      setSubmitError(String(e));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const requestChanges = async () => {
+    setSubmitting(true);
+    setSubmitError(null);
+    try {
+      await postDone({ verdict: "request_changes", summary });
       clearViewedFiles();
       setSubmitted(true);
     } catch (e) {
@@ -113,14 +135,46 @@ export function ChapterReview({
           </button>
         </div>
         <div className="flex flex-col items-end gap-1">
-          <button
-            onClick={done}
-            disabled={submitting}
-            className="rounded-lg px-4 py-1.5 text-sm font-medium text-white disabled:opacity-50"
-            style={{ background: "var(--rb-accent)" }}
-          >
-            {submitting ? "Submitting…" : "Done"}
-          </button>
+          <div className="flex items-center gap-2">
+            {roundtrip && (
+              <button
+                onClick={() => setRequesting((v) => !v)}
+                disabled={submitting}
+                className="rounded-lg px-4 py-1.5 text-sm font-medium disabled:opacity-50"
+                style={{ border: "1px solid var(--rb-border)", color: "var(--color-risk-high)" }}
+              >
+                Request changes
+              </button>
+            )}
+            <button
+              onClick={done}
+              disabled={submitting}
+              className="rounded-lg px-4 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+              style={{ background: "var(--rb-accent)" }}
+            >
+              {submitting ? "Submitting…" : "Done"}
+            </button>
+          </div>
+          {roundtrip && requesting && (
+            <div className="flex w-72 flex-col gap-1">
+              <textarea
+                value={summary}
+                onChange={(e) => setSummary(e.target.value)}
+                placeholder="What should change?"
+                rows={3}
+                className="w-full rounded-md border px-2 py-1 text-sm"
+                style={{ borderColor: "var(--rb-border)", background: "var(--rb-bg)" }}
+              />
+              <button
+                onClick={requestChanges}
+                disabled={submitting}
+                className="self-end rounded-lg px-3 py-1 text-xs font-medium text-white disabled:opacity-50"
+                style={{ background: "var(--color-risk-high)" }}
+              >
+                Submit request
+              </button>
+            </div>
+          )}
           {submitError && (
             <p className="text-xs" style={{ color: "var(--color-risk-high)" }}>
               {submitError}
