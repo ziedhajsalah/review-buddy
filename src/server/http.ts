@@ -9,6 +9,7 @@
  * `done` resolves when the reviewer is finished, which is how the blocking
  * PreToolUse hook knows to return control to the agent.
  */
+import { createHash, timingSafeEqual } from "node:crypto";
 import { existsSync } from "node:fs";
 import { join, resolve, sep } from "node:path";
 import type { ResolvedReview } from "../types/review.ts";
@@ -53,10 +54,21 @@ export interface RunningServer {
 
 const ALLOWED_HOSTS = new Set(["127.0.0.1", "localhost"]);
 
+/** Constant-time string equality (hash first: equal length, no early exit). */
+function safeEqual(a: string, b: string): boolean {
+  const ha = createHash("sha256").update(a).digest();
+  const hb = createHash("sha256").update(b).digest();
+  return timingSafeEqual(ha, hb);
+}
+
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), {
     status,
-    headers: { "content-type": "application/json" },
+    headers: {
+      "content-type": "application/json",
+      "cache-control": "no-store",
+      "referrer-policy": "no-referrer",
+    },
   });
 
 export function startServer(ctx: ServerContext): RunningServer {
@@ -99,7 +111,7 @@ export function startServer(ctx: ServerContext): RunningServer {
       if (pathname.startsWith("/api/")) {
         const supplied =
           req.headers.get("x-review-buddy-token") ?? url.searchParams.get("token");
-        if (supplied !== token) return json({ error: "unauthorized" }, 401);
+        if (!supplied || !safeEqual(supplied, token)) return json({ error: "unauthorized" }, 401);
       }
 
       if (pathname === "/api/review") {
@@ -133,7 +145,12 @@ export function startServer(ctx: ServerContext): RunningServer {
 
       // Static: built UI when available, else a placeholder viewer.
       if (ctx.uiDir) {
-        const decoded = decodeURIComponent(pathname);
+        let decoded: string;
+        try {
+          decoded = decodeURIComponent(pathname);
+        } catch {
+          return new Response("Not found", { status: 404 });
+        }
         const rel = pathname === "/" ? "index.html" : decoded.replace(/^\/+/, "");
         // Reject traversal before touching the filesystem.
         const safe = !rel.split("/").includes("..") && isInside(ctx.uiDir, rel);

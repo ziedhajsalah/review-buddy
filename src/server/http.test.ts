@@ -180,4 +180,46 @@ describe("HTTP server", () => {
     const done = await server.done;
     expect(done.verdict).toBe("ok");
   });
+
+  test("malformed percent-encoding yields 404, not a 500", async () => {
+    const uiDir = mkdtempSync(join(tmpdir(), "rb-ui-"));
+    writeFileSync(join(uiDir, "index.html"), "<!doctype html><title>x</title>");
+    const agent: AgentReview = {
+      prologue: {
+        why: "w",
+        what: "x",
+        key_changes: [
+          { headline: "h1", detail: "d1" },
+          { headline: "h2", detail: "d2" },
+        ],
+        review_focus: { summary: "s", file: "app.ts" },
+      },
+      chapters: [
+        {
+          index: 1,
+          title: "Tweak b",
+          risk: "Low",
+          risk_reason: "trivial",
+          description: "changes b",
+          files: [{ path: "app.ts", change_type: "modified" }],
+        },
+      ],
+    };
+    const pr: PrMetadata = capturePr(dir, base);
+    const { review } = resolveReview(agent, captureDiff(dir, base), META, pr);
+    const s = startServer({ review, cwd: dir, baseRef: base, uiDir });
+    try {
+      const proc = Bun.spawn([
+        "curl", "-s", "-o", "/dev/null", "-w", "%{http_code}",
+        "-H", `x-review-buddy-token: ${s.token}`,
+        `http://127.0.0.1:${s.port}/%`,
+      ]);
+      const code = (await new Response(proc.stdout).text()).trim();
+      await proc.exited;
+      expect(code).toBe("404");
+    } finally {
+      s.stop();
+      rmSync(uiDir, { recursive: true, force: true });
+    }
+  });
 });

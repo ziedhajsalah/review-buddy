@@ -18,6 +18,7 @@ import { assertSafeRef, captureDiff, capturePr, capturePrDiff, ensureCommit, prB
 import { resolveReview } from "../server/resolve.ts";
 import { startServer } from "../server/http.ts";
 import { openBrowser } from "../server/browser.ts";
+import { validateAgentReview } from "./validate.ts";
 
 interface HookEvent {
   tool_name?: string;
@@ -122,12 +123,14 @@ async function runOpenReview(): Promise<never> {
 
   const agent = event.tool_input;
   const cwd = event.cwd ?? process.cwd();
-  if (!agent || !agent.prologue || !Array.isArray(agent.chapters)) {
+  const invalid = validateAgentReview(agent);
+  if (invalid) {
+    console.error(`[review-buddy] Invalid review payload: ${invalid}`);
     allow("Review Buddy received no valid review payload; proceeding.");
   }
 
   try {
-    await serveAndBlock(agent, cwd);
+    await serveAndBlock(agent as AgentReview, cwd);
   } catch (err) {
     console.error(`[review-buddy] Viewer error: ${String(err)}`);
     allow("Review Buddy hit an error rendering the review; proceeding.");

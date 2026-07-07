@@ -108,7 +108,17 @@ export function resolveReview(
 
   const chapters: ResolvedChapter[] = [];
 
-  for (const ch of agent.chapters) {
+  // Defense in depth: chapter indices drive hunk claiming and UI keys. Trust
+  // the ORDER the agent chose, not the numbers (dupes/gaps/negatives happen).
+  const chaptersInOrder = agent.chapters.map((ch, i) => {
+    const index = i + 1;
+    if (ch.index !== index) {
+      warnings.push(`Chapter "${ch.title}": index ${ch.index} normalized to ${index}.`);
+    }
+    return { ...ch, index };
+  });
+
+  for (const ch of chaptersInOrder) {
     const files: ResolvedFile[] = [];
 
     for (const af of ch.files) {
@@ -175,7 +185,7 @@ export function resolveReview(
     }
   }
   if (unsortedFiles.length > 0) {
-    const nextIndex = agent.chapters.reduce((m, c) => Math.max(m, c.index), 0) + 1;
+    const nextIndex = chaptersInOrder.length + 1;
     warnings.push(
       `${unsortedFiles.length} file(s) had changes not grouped into any chapter — ` +
         `bucketed into "${UNSORTED_TITLE}".`,

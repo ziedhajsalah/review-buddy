@@ -58,7 +58,10 @@ export function assertPrRef(ref: string): void {
 
 /** Resolve the diff base ref: explicit override, else HEAD, else empty tree. */
 export function resolveBase(cwd: string, override?: string): string {
-  if (override) return override;
+  if (override) {
+    assertSafeRef(override);
+    return override;
+  }
   const hasHead = git(cwd, ["rev-parse", "--verify", "--quiet", "HEAD"], true).trim();
   return hasHead ? "HEAD" : EMPTY_TREE;
 }
@@ -220,5 +223,6 @@ export function fileContent(
   }
   const ref = baseRef === EMPTY_TREE ? "" : baseRef;
   if (!ref) return "";
+  assertSafeRef(ref);
   return git(cwd, ["show", `${ref}:${path}`], true);
 }
