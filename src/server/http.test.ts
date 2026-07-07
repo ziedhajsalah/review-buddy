@@ -81,6 +81,7 @@ describe("HTTP server", () => {
     const hunk = r.chapters[0].files[0].hunks[0];
     expect(hunk.lines).toContain("+const b = 22;");
     expect(hunk.lines).toContain("-const b = 2;");
+    expect(Array.isArray(r.warnings)).toBe(true);
   });
 
   test("GET /api/file-content serves head (working tree) and base (committed) bytes", async () => {

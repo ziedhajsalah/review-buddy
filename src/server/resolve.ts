@@ -203,7 +203,7 @@ export function resolveReview(
   };
 
   return {
-    review: { meta, pr, prologue: agent.prologue, stats, chapters },
+    review: { meta, pr, prologue: agent.prologue, stats, chapters, warnings },
     warnings,
   };
 }
