@@ -93,6 +93,12 @@
     background: var(--paper-2);
     color: var(--ink-soft);
   }
+  .pill.live {
+    border-color: var(--risk-low);
+    color: var(--risk-low);
+    background: #e4efe9;
+    font-weight: 600;
+  }
 
   .rule {
     width: 100%; height: 1px;
@@ -284,7 +290,6 @@
   .verb.get { color: var(--b); }
   .verb.post { color: var(--accent); }
   .ph2 td { opacity: .62; }
-  .ph2 td::after { }
 
   /* ---------- Phases ---------- */
   .phases { display: grid; grid-template-columns: repeat(4,1fr); gap: 16px; }
@@ -294,15 +299,15 @@
     background: var(--paper-2); border: 1px solid var(--line);
     border-radius: 14px; padding: 18px;
   }
-  .phase.now { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+  .phase.shipped { border-color: var(--risk-low); box-shadow: 0 0 0 1px var(--risk-low); }
   .phase .pn { font-family: var(--mono); font-size: 11px; letter-spacing:.1em; color: var(--ink-faint); }
-  .phase.now .pn { color: var(--accent); }
+  .phase.shipped .pn { color: var(--risk-low); }
   .phase h4 { margin: 6px 0 8px; font-size: 16px; }
   .phase ul { margin: 0; padding-left: 18px; font-size: 13.5px; color: var(--ink-soft); }
   .phase ul li { margin-bottom: 4px; }
-  .badge-now {
+  .badge-shipped {
     display:inline-block; font-family: var(--mono); font-size: 10px;
-    background: var(--accent); color: #fff; padding: 2px 7px; border-radius: 999px;
+    background: var(--risk-low); color: #fff; padding: 2px 7px; border-radius: 999px;
     margin-left: 6px; vertical-align: middle;
   }
 
@@ -320,8 +325,17 @@
     padding: 18px 22px;
     border-radius: 0 12px 12px 0;
   }
+  .callout.teal {
+    border-left-color: var(--accent-2);
+    background: linear-gradient(90deg, #eaf3ef, transparent 80%);
+  }
   .callout strong { color: var(--accent); }
+  .callout.teal strong { color: var(--accent-2); }
   .callout p { margin: 0; color: var(--ink-soft); font-size: 15.5px; }
+  .callout code {
+    font-family: var(--mono); font-size: 13px;
+    background: #f0ebe0; padding: 1px 5px; border-radius: 4px; color: var(--ink);
+  }
 </style>
 </head>
 <body>
@@ -331,10 +345,10 @@
   <h1>Review&nbsp;Buddy</h1>
   <p class="lede">A pull request isn't a wall of diffs — it's a story. An agent reads the changes, writes a <em>Prologue</em>, and segments the work into risk-rated <em>Chapters</em> you walk through in the browser.</p>
   <div class="tag">
+    <span class="pill live">v0.1.0 · Phase 1 shipped</span>
     <span class="pill">Claude Code only</span>
     <span class="pill">MCP tool + PreToolUse hook</span>
     <span class="pill">reference-not-reproduce</span>
-    <span class="pill">React · REST · git</span>
   </div>
 </header>
 
@@ -346,7 +360,7 @@
     <div class="sec-head">
       <span class="sec-num">01 — THE IDEA</span>
       <h2>From a diff dump to a guided reading</h2>
-      <p>The central abstraction is the <strong>Chapter</strong>: a thematic grouping of related changes — one logical sub-problem — carrying its own risk rating, stats, file set, and an AI-written explanation. Above them sits the <strong>Prologue</strong>, an orientation summary of the whole PR.</p>
+      <p>The central abstraction is the <strong>Chapter</strong>: a thematic grouping of related changes — one logical sub-problem — carrying its own risk rating, stats, file set, and an AI-written explanation. Above them sits the <strong>Prologue</strong>, an orientation summary of the whole PR. All agent prose renders as <strong>markdown</strong> (GFM, no raw HTML).</p>
     </div>
 
     <div class="book-grid">
@@ -426,12 +440,13 @@
 
         <!-- Agent -->
         <rect class="box" x="20" y="40" rx="11" width="170" height="74"/>
-        <text class="lbl" x="105" y="70" text-anchor="middle">Claude Code agent</text>
-        <text class="sub" x="105" y="90" text-anchor="middle">runs /review skill</text>
+        <text class="lbl" x="105" y="68" text-anchor="middle">Claude Code agent</text>
+        <text class="sub" x="105" y="88" text-anchor="middle">runs /review skill</text>
+        <text class="sub" x="105" y="103" text-anchor="middle" style="fill:#6c4cb1">declares source</text>
 
         <!-- arrow agent -> tool -->
         <path class="flowA" d="M190,77 H300" marker-end="url(#arrowA)"/>
-        <text class="step" x="245" y="68" text-anchor="middle">submit_review(JSON)</text>
+        <text class="step" x="245" y="68" text-anchor="middle">submit_review({source,…})</text>
 
         <!-- MCP tool -->
         <rect class="box" x="300" y="40" rx="11" width="180" height="74" style="stroke:#6c4cb1;"/>
@@ -445,7 +460,7 @@
         <!-- Hook -->
         <rect x="250" y="160" rx="13" width="420" height="84" fill="url(#hookg)" stroke="#b4531f" stroke-width="1.8"/>
         <text class="lbl" x="460" y="190" text-anchor="middle" style="fill:#7a3712">open-review hook · BLOCKS the turn</text>
-        <text class="sub" x="460" y="210" text-anchor="middle" style="fill:#8a4a25">capture diff · merge sources · serve · open browser</text>
+        <text class="sub" x="460" y="210" text-anchor="middle" style="fill:#8a4a25">re-capture the SAME diff (per source) · merge · serve · open</text>
         <text class="sub" x="460" y="228" text-anchor="middle" style="fill:#8a4a25">long timeout (≈4 days) — the human is never rushed</text>
 
         <!-- three sources feeding hook -->
@@ -469,7 +484,7 @@
 
         <!-- Browser -->
         <rect class="box" x="700" y="40" rx="11" width="200" height="74" style="stroke:#2f6f5e"/>
-        <text class="lbl" x="800" y="70" text-anchor="middle">Prebuilt React app</text>
+        <text class="lbl" x="800" y="70" text-anchor="middle">React app (built once)</text>
         <text class="sub" x="800" y="90" text-anchor="middle">GET /api/review → render</text>
 
         <!-- arrow hook -> browser -->
@@ -477,6 +492,10 @@
         <text class="step" x="800" y="150" text-anchor="middle">serve + open</text>
       </svg>
       <div class="figcap">The agent supplies judgment and structure; git supplies the bytes. The hook is the conductor.</div>
+    </div>
+
+    <div class="callout teal">
+      <p><strong>The hook never sees your command.</strong> The agent's <code>submit_review</code> carries a <code>source</code> — <code>{ type: "worktree" }</code>, <code>{ type: "pr", ref }</code>, or <code>{ type: "branch", ref }</code> — so the hook re-captures the <em>same</em> diff the agent read. For a PR it runs <code>gh pr diff &lt;ref&gt;</code> against the PR's real bytes; without <code>source</code> the viewer would render empty. You never have to check the branch out.</p>
     </div>
   </div>
 </section>
@@ -547,7 +566,7 @@
         <div class="tagn">SOURCE C</div>
         <h4>Full file contents</h4>
         <p>Bytes <em>around</em> the diff — for "expand full file" and word-level highlighting.</p>
-        <p>Fetched on demand via <code>git show</code>.</p>
+        <p>Fetched on demand via <code>git show</code> (PR-aware).</p>
       </div>
     </div>
   </div>
@@ -620,6 +639,7 @@
         <div class="contract-label">① Agent — <b>submit_review input</b></div>
         <pre class="code"><span class="c">// narrative + grouping + anchors</span>
 {
+  <span class="k">"source"</span>: { <span class="k">"type"</span>: <span class="s">"pr"</span>, <span class="k">"ref"</span>: <span class="s">"42"</span> },
   <span class="k">"prologue"</span>: {
     <span class="k">"why"</span>:  <span class="s">"…the user-facing bug"</span>,
     <span class="k">"what"</span>: <span class="s">"…the resolution"</span>,
@@ -672,15 +692,15 @@
     <div class="sec-head">
       <span class="sec-num">06 — SERVER ENDPOINTS</span>
       <h2>A tiny REST surface on an ephemeral port</h2>
-      <p>One prebuilt React app fetches the review from a local server. JSON is runtime state served over REST — no per-review codegen or compile.</p>
+      <p>One built React app fetches the review from a local server — loopback-only bind, Host-header validation, and a per-server token guard every <code style="font-family:var(--mono)">/api/*</code> route. JSON is runtime state served over REST; syntax highlighting (Shiki) and word-level diffing happen client-side. No per-review codegen or compile.</p>
     </div>
 
     <table class="ep">
       <thead><tr><th>Endpoint</th><th>Method</th><th>Purpose</th><th>Phase</th></tr></thead>
       <tbody>
-        <tr><td class="m">/api/review</td><td><span class="verb get">GET</span></td><td>Merged review: meta · pr · prologue · chapters · stats. Hunks resolved here.</td><td class="m">1</td></tr>
-        <tr><td class="m">/api/file-content</td><td><span class="verb get">GET</span></td><td>Full file for expansion / word-level context <code style="font-family:var(--mono)">?path=&amp;side=</code>.</td><td class="m">1</td></tr>
-        <tr><td class="m">/api/done</td><td><span class="verb post">POST</span></td><td>Reviewer closes the viewer; unblocks the hook (returns <code style="font-family:var(--mono)">allow</code>).</td><td class="m">1</td></tr>
+        <tr><td class="m">/api/review</td><td><span class="verb get">GET</span></td><td>Merged review: meta · pr · prologue · chapters · stats. Hunks resolved here.</td><td class="m">1 ✓</td></tr>
+        <tr><td class="m">/api/file-content</td><td><span class="verb get">GET</span></td><td>Full file for expansion / word-level context <code style="font-family:var(--mono)">?path=&amp;side=</code> — PR-aware (reads the PR's bytes, never your worktree).</td><td class="m">1 ✓</td></tr>
+        <tr><td class="m">/api/done</td><td><span class="verb post">POST</span></td><td>Reviewer closes the viewer; unblocks the hook (returns <code style="font-family:var(--mono)">allow</code>).</td><td class="m">1 ✓</td></tr>
         <tr class="ph2"><td class="m">/api/file-viewed</td><td><span class="verb post">POST</span></td><td>Persist per-file / chapter viewed state (round-trip).</td><td class="m">2</td></tr>
         <tr class="ph2"><td class="m">/api/feedback</td><td><span class="verb post">POST</span></td><td>Submit verdict + annotations; hook returns <code style="font-family:var(--mono)">deny</code> + feedback to the agent.</td><td class="m">2</td></tr>
         <tr class="ph2"><td class="m">/api/github/*</td><td class="m">—</td><td>Open PR, copy branch, CI status, reviewers (via <code style="font-family:var(--mono)">gh</code>).</td><td class="m">3</td></tr>
@@ -698,18 +718,19 @@
     <div class="sec-head">
       <span class="sec-num">07 — ROADMAP</span>
       <h2>Build the viewer first; round-trip is a drop-in</h2>
-      <p>The blocking hook stays from day one — so swapping the "Done" response for "approve / request-changes + annotations" later is a small change, not a rewrite.</p>
+      <p>The blocking hook stays from day one — so swapping the "Done" response for "approve / request-changes + annotations" later is a small change, not a rewrite. Phase 1 shipped in v0.1.0.</p>
     </div>
 
     <div class="phases">
-      <div class="phase now">
-        <div class="pn">PHASE 1<span class="badge-now">NOW</span></div>
+      <div class="phase shipped">
+        <div class="pn">PHASE 1<span class="badge-shipped">✓ SHIPPED</span></div>
         <h4>One-way viewer</h4>
         <ul>
           <li>MCP server + tool</li>
           <li>/review skill</li>
           <li>open-review hook</li>
-          <li>Prologue · chapters · split-pane diff viewer</li>
+          <li>Prologue · chapters · unified/split diff viewer</li>
+          <li><em>expand full file</em> — the one bit deferred</li>
         </ul>
       </div>
       <div class="phase">
@@ -743,8 +764,8 @@
 </section>
 
 <footer>
-  <div class="mono">review-buddy · narrative code review for Claude Code</div>
-  <div style="margin-top:8px">Inspired by <a href="https://github.com/backnotprop/plannotator">Plannotator</a> · See <span class="mono">CLAUDE.md</span> &amp; <span class="mono">docs/</span> for the source of truth.</div>
+  <div class="mono">review-buddy · narrative code review for Claude Code · v0.1.0</div>
+  <div style="margin-top:8px">A companion illustration to <span class="mono">docs/ARCHITECTURE.md</span> · see <span class="mono">CLAUDE.md</span> for the source of truth · inspired by <a href="https://github.com/backnotprop/plannotator">Plannotator</a>.</div>
 </footer>
 
 </body>

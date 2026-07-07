@@ -1,6 +1,6 @@
 # Architecture
 
-How the PRD's product requirements map onto a concrete, buildable system. Read `CLAUDE.md` first for the high-level decisions; this doc is the engineering detail.
+How the PRD's product requirements map onto a concrete, buildable system. Read `CLAUDE.md` first for the high-level decisions; this doc is the engineering detail. For a visual walkthrough of the same system, open [`architecture.html`](./architecture.html) in a browser.
 
 ## Data flow
 
@@ -79,10 +79,10 @@ Define the `submit_review` MCP tool's `inputSchema` = `schemas/review.schema.jso
 ## Diff & rendering notes
 
 - **Parsing:** parse the unified diff from `git diff` into files → hunks (with exact `@@` headers and line numbers). Assign each hunk to a chapter by matching `path` + the agent's anchor. A hunk with no chapter match → bucket into a synthetic "Unsorted" chapter (and log it) rather than dropping it.
-- **Word-level:** compute intra-line highlights client-side by diffing each removed/added line pair (e.g. the `diff` npm package). Never expect this from the agent.
+- **Word-level:** intra-line highlights are computed client-side by `@pierre/diffs`. Never expect this from the agent.
 - **Collapse / expand:** the diff view shows changed hunks + a few context lines by default; "N unmodified lines" expanders and "expand full file" call `/api/file-content`.
-- **Syntax highlighting:** derive language from the file extension (`path`); highlight client-side (highlight.js or Shiki).
-- **Multi-chapter files:** keep viewed-state keyed by `(chapterIndex, path)` if the same file appears in multiple chapters (decide in the phase that adds persistence).
+- **Syntax highlighting:** derive language from the file extension (`path`); highlight client-side with Shiki (`shiki-js`, via `@pierre/diffs`).
+- **Multi-chapter files:** viewed-state is keyed by `(chapterIndex, path)`, so the same file can appear in multiple chapters with independent viewed flags (shipped in the viewer's client-side state).
 
 ## Client-side state (source D)
 

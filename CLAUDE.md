@@ -2,7 +2,7 @@
 
 An AI-assisted **narrative code review** tool for Claude Code. Instead of showing a pull request as one flat diff, an agent reads the changes, writes a high-level **Prologue**, and segments the work into risk-rated thematic **Chapters** that a reviewer walks through sequentially in a browser UI.
 
-> **Status:** greenfield. This repo currently contains the design kit (docs + contracts) only — no implementation yet. Start with `docs/build-plan.md`.
+> **Status:** Phase 1 shipped (one-way viewer): the `submit_review` MCP tool, the `PreToolUse` hook, a hardened loopback-only HTTP server, and the React viewer are all live with tests green. See `README.md` for install/dev and `docs/build-plan.md` for what's deferred to Phases 2–4.
 
 ## What it does (target flow)
 
@@ -47,24 +47,30 @@ See `docs/review-contract.md` for the exact **agent contract** vs **UI/server co
 ```
 review-buddy/
 ├── CLAUDE.md                  # you are here — orientation + decisions
-├── README.md                  # short human overview
+├── README.md                  # human overview: install, dev, status
+├── .claude-plugin/            # plugin.json + marketplace.json (Claude Code plugin manifest)
+├── bin/review-buddy.js        # plugin entry shim → src/cli
+├── hooks/hooks.json           # the real PreToolUse hook wiring
+├── skills/review/SKILL.md     # the /review skill — the structuring prompt (source of truth)
+├── src/
+│   ├── mcp/server.ts          # MCP server exposing submit_review
+│   ├── cli/index.ts           # PreToolUse hook entry (open-review)
+│   ├── server/                # diff capture, chapter resolution, local HTTP server, browser open
+│   ├── ui/                    # Vite + React 19 + Tailwind v4 viewer (@pierre/diffs)
+│   └── types/review.ts        # shared agent + UI/server contracts
+├── schemas/review.schema.json # JSON Schema = submit_review inputSchema
 ├── docs/
 │   ├── PRD.md                 # product requirements (source of truth for UX)
 │   ├── ARCHITECTURE.md        # data sources, flow, hook+server, endpoints, phasing
-│   ├── agent-prompt.md        # the structuring prompt (revised: reference-not-reproduce)
 │   ├── review-contract.md     # agent contract vs UI/server contract + examples
-│   └── build-plan.md          # proposed stack + phased task breakdown — START HERE
-├── schemas/
-│   └── review.schema.json     # JSON Schema = submit_review inputSchema (agent output)
-├── src/types/
-│   └── review.ts              # TS types for both contracts
-└── examples/
-    └── hooks.json             # example Claude Code plugin hook config
+│   └── build-plan.md          # shipped/deferred ledger + phased breakdown
+├── examples/hooks.json        # example plugin hook config (installed-binary form)
+└── scripts/release.sh         # version bump across files + release
 ```
 
-## Phase 1 scope (what to build first)
+## Phase 1 (shipped)
 
-Prologue + Description tab, chapter list, chapter review split-pane, diff viewer (unified/split, display settings, collapse "N unmodified lines" / expand full file, word-level granularity), per-file controls (collapse / copy name / expand / mark viewed locally).
+Prologue + Description overview, chapter list, chapter review split-pane, and the diff viewer (unified/split, display settings, collapse "N unmodified lines", word-level granularity), with per-file controls (collapse / copy name / mark viewed locally). "Expand full file" is the one Phase 1 item still deferred — the backend serves `/api/file-content`, but wiring it into the viewer lands in a later phase.
 
 **Deferred to later phases** (per PRD): viewed-state persistence round-trip, verdict submission, GitHub collaboration (open PR, copy branch, reviewers, CI), Activity view, Chat, conversational AI assistant.
 
