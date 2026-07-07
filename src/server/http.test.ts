@@ -93,6 +93,43 @@ describe("HTTP server", () => {
     expect(baseSide.content).toBe("const a = 1;\nconst b = 2;\nconst c = 3;\n");
   });
 
+  test("PR-unavailable mode (headRef: null) serves empty head content, never worktree bytes", async () => {
+    const agent: AgentReview = {
+      prologue: {
+        why: "w",
+        what: "x",
+        key_changes: [
+          { headline: "h1", detail: "d1" },
+          { headline: "h2", detail: "d2" },
+        ],
+        review_focus: { summary: "s", file: "app.ts" },
+      },
+      chapters: [
+        {
+          index: 1,
+          title: "Tweak b",
+          risk: "Low",
+          risk_reason: "trivial",
+          description: "changes b",
+          files: [{ path: "app.ts", change_type: "modified" }],
+        },
+      ],
+    };
+    const pr: PrMetadata = capturePr(dir, base);
+    const { review } = resolveReview(agent, captureDiff(dir, base), META, pr);
+    const s = startServer({ review, cwd: dir, baseRef: base, headRef: null });
+    try {
+      const res = await fetch(
+        `http://127.0.0.1:${s.port}/api/file-content?path=app.ts&side=head`,
+        { headers: { "x-review-buddy-token": s.token } },
+      );
+      const body = await res.json();
+      expect(body.content).toBe(""); // PR mode, unavailable — NOT the worktree "const b = 22;"
+    } finally {
+      s.stop();
+    }
+  });
+
   test("rejects path traversal / non-review files on /api/file-content", async () => {
     const traversal = await authed(
       `api/file-content?path=${encodeURIComponent("../../../../etc/passwd")}`,

@@ -26,6 +26,12 @@ export interface ServerContext {
   review: ResolvedReview;
   cwd: string;
   baseRef: string;
+  /**
+   * PR head ref for file-content expansion. SHA = read that commit; null = PR
+   * mode but the commit isn't available (serve "", never the worktree);
+   * undefined = worktree/branch mode (read the working tree). See fileContent.
+   */
+  headRef?: string | null;
   /** Directory of the built React UI (src/ui/dist). Falls back to a placeholder. */
   uiDir?: string;
 }
@@ -107,7 +113,7 @@ export function startServer(ctx: ServerContext): RunningServer {
         // Allowlist (review files only) + containment guard against traversal.
         if (!allowedPaths.has(path)) return json({ error: "unknown path" }, 403);
         if (!isInside(ctx.cwd, path)) return json({ error: "path outside repo" }, 400);
-        const content = fileContent(ctx.cwd, path, side, ctx.baseRef);
+        const content = fileContent(ctx.cwd, path, side, ctx.baseRef, ctx.headRef);
         return json({ path, side, language: languageOf(path), content });
       }
 

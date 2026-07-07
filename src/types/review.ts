@@ -108,6 +108,8 @@ export interface PrMetadata {
   head: string;
   url?: string;          // phase 2
   ciStatus?: string;     // phase 2
+  /** PR head commit SHA (PR mode only) — drives file-content expansion. */
+  headRefOid?: string;
 }
 
 /** A resolved hunk: anchor + real content attached from git diff (B). */

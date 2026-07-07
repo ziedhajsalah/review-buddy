@@ -108,6 +108,7 @@ interface GhPr {
   baseRefName?: string;
   headRefName?: string;
   url?: string;
+  headRefOid?: string;
 }
 
 /**
@@ -124,7 +125,7 @@ export function capturePr(cwd: string, base: string, ref?: string): PrMetadata {
     assertPrRef(ref);
     ghArgs.push(ref);
   }
-  ghArgs.push("--json", "title,body,author,createdAt,baseRefName,headRefName,url");
+  ghArgs.push("--json", "title,body,author,createdAt,baseRefName,headRefName,url,headRefOid");
   const ghJson = run("gh", cwd, ghArgs, true).trim();
 
   if (ghJson.startsWith("{")) {
@@ -138,6 +139,7 @@ export function capturePr(cwd: string, base: string, ref?: string): PrMetadata {
         base: pr.baseRefName ?? base,
         head: pr.headRefName ?? branch,
         url: pr.url,
+        headRefOid: pr.headRefOid,
       };
     } catch {
       /* fall through to git fallback */
@@ -157,16 +159,62 @@ export function capturePr(cwd: string, base: string, ref?: string): PrMetadata {
 }
 
 /**
+ * Make a commit reachable locally, fetching it if needed (PR head commits
+ * usually aren't). Fail-open: returns false when the object can't be obtained
+ * (offline, no remote) — callers degrade to empty content.
+ */
+export function ensureCommit(cwd: string, sha: string, prRef?: string): boolean {
+  if (!/^[0-9a-f]{7,40}$/i.test(sha)) return false;
+  const have = () => {
+    try {
+      run("git", cwd, ["cat-file", "-e", `${sha}^{commit}`]);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  if (have()) return true;
+  // Prefer the PR ref (always fetchable on GitHub); fall back to the raw SHA.
+  const prNumber = prRef?.match(/(\d+)$/)?.[1];
+  if (prNumber) {
+    run("git", cwd, ["fetch", "origin", `pull/${prNumber}/head`], true);
+    if (have()) return true;
+  }
+  run("git", cwd, ["fetch", "origin", sha], true);
+  return have();
+}
+
+/**
+ * Best base for PR full-file expansion: merge-base of the PR head and the
+ * base branch. Falls back to the branch name when anything fails (offline,
+ * no remote) — callers keep today's behavior in that case.
+ */
+export function prBaseRef(cwd: string, headSha: string, baseBranch: string): string {
+  assertSafeRef(baseBranch); // from GitHub API data — guard like other refs
+  run("git", cwd, ["fetch", "origin", baseBranch], true);
+  const mb = run("git", cwd, ["merge-base", headSha, `origin/${baseBranch}`], true).trim();
+  return /^[0-9a-f]{40}$/i.test(mb) ? mb : baseBranch;
+}
+
+/**
  * Full file contents (source C) for "expand full file" + word-level context.
- * head = current working-tree bytes; base = the file at the diff base ref.
+ * head = the working-tree bytes (worktree/branch mode) or the PR head commit's
+ * bytes (PR mode, when `headRef` is a SHA); base = the file at the diff base
+ * ref. `headRef` is tri-state: SHA = read that commit; null = PR mode but the
+ * commit is unavailable, return "" (never the worktree); undefined = worktree
+ * mode, read the working tree.
  */
 export function fileContent(
   cwd: string,
   path: string,
   side: "base" | "head",
   baseRef: string,
+  headRef?: string | null,
 ): string {
   if (side === "head") {
+    // PR mode: the reviewed state is a commit, not the local working tree.
+    if (headRef) return git(cwd, ["show", `${headRef}:${path}`], true);
+    if (headRef === null) return ""; // PR mode, content unavailable — never leak worktree bytes
     const abs = join(cwd, path);
     return existsSync(abs) ? readFileSync(abs, "utf8") : "";
   }
