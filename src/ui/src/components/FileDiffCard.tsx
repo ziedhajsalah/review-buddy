@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { memo, useMemo, useState } from "react";
 import { PatchDiff } from "@pierre/diffs/react";
 import type { ResolvedFile, DisplaySettings } from "../../../types/review.ts";
 import { DiffStat } from "./DiffStat.tsx";
@@ -12,7 +12,14 @@ const CHANGE_LABEL: Record<ResolvedFile["change_type"], string> = {
   renamed: "renamed",
 };
 
-export function FileDiffCard({
+// Memoized on purpose: ChapterReview mounts one card per file and re-renders on
+// every filter keystroke / viewed toggle. Each card re-render synchronously
+// re-runs @pierre/diffs' main-thread render, so without memo one keystroke
+// re-highlights every diff. memo only works while its props stay referentially
+// stable — in particular `onToggleViewed` must be passed as a stable callback
+// (it takes the path so the parent can hand over `toggleViewed` directly rather
+// than allocating a per-render arrow). Do not re-wrap it in a closure.
+export const FileDiffCard = memo(function FileDiffCard({
   file,
   settings,
   viewed,
@@ -21,7 +28,7 @@ export function FileDiffCard({
   file: ResolvedFile;
   settings: DisplaySettings;
   viewed: boolean;
-  onToggleViewed: () => void;
+  onToggleViewed: (path: string) => void;
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -75,7 +82,7 @@ export function FileDiffCard({
             {copied ? "copied!" : "copy path"}
           </button>
           <label className="flex cursor-pointer items-center gap-1 text-xs select-none" style={{ color: "var(--rb-muted)" }}>
-            <input type="checkbox" checked={viewed} onChange={onToggleViewed} className="accent-[var(--rb-accent)]" />
+            <input type="checkbox" checked={viewed} onChange={() => onToggleViewed(file.path)} className="accent-[var(--rb-accent)]" />
             viewed
           </label>
         </div>
@@ -93,4 +100,4 @@ export function FileDiffCard({
         ))}
     </section>
   );
-}
+});

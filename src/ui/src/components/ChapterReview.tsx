@@ -184,7 +184,11 @@ export function ChapterReview({
                     file={f}
                     settings={settings}
                     viewed={viewed.has(f.path)}
-                    onToggleViewed={() => toggleViewed(f.path)}
+                    // Stable ref (useCallback in useViewedFiles) — pass it
+                    // directly rather than re-wrapping it in a per-render arrow
+                    // closure, which is what keeps FileDiffCard's memo alive.
+                    // The card supplies the path.
+                    onToggleViewed={toggleViewed}
                   />
                 </div>
               ))}
