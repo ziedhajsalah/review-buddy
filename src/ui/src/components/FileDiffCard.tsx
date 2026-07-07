@@ -60,7 +60,7 @@ export function FileDiffCard({
             {collapsed ? "▸" : "▾"}
           </button>
           <span className="truncate font-mono text-sm" title={file.path}>
-            {file.path}
+            {file.old_path ? `${file.old_path} → ${file.path}` : file.path}
           </span>
           <span
             className="shrink-0 rounded px-1.5 py-0.5 text-[0.62rem] uppercase"
@@ -81,11 +81,16 @@ export function FileDiffCard({
         </div>
       </header>
 
-      {!collapsed && (
-        <div className="overflow-x-auto text-[13px]">
-          <PatchDiff patch={patch} options={options} disableWorkerPool />
-        </div>
-      )}
+      {!collapsed &&
+        (file.binary ? (
+          <p className="p-4 text-sm" style={{ color: "var(--rb-muted)" }}>
+            Binary file — content not shown.
+          </p>
+        ) : (
+          <div className="overflow-x-auto text-[13px]">
+            <PatchDiff patch={patch} options={options} disableWorkerPool />
+          </div>
+        ))}
     </section>
   );
 }

@@ -7,11 +7,12 @@
 import type { ResolvedFile } from "../../../types/review.ts";
 
 export function fileToPatch(f: ResolvedFile): string {
-  const oldName = f.change_type === "added" ? "/dev/null" : `a/${f.path}`;
+  const oldPath = f.old_path ?? f.path;
+  const oldName = f.change_type === "added" ? "/dev/null" : `a/${oldPath}`;
   const newName = f.change_type === "deleted" ? "/dev/null" : `b/${f.path}`;
 
   const header =
-    `diff --git a/${f.path} b/${f.path}\n` + `--- ${oldName}\n` + `+++ ${newName}\n`;
+    `diff --git a/${oldPath} b/${f.path}\n` + `--- ${oldName}\n` + `+++ ${newName}\n`;
 
   const body = f.hunks
     .map((h) => `${h.header}\n${h.lines.join("\n")}`)
