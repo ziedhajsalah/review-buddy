@@ -1,10 +1,11 @@
-import { expect, test } from "bun:test";
+import { expect, spyOn, test } from "bun:test";
 import { execFileSync } from "node:child_process";
+import * as childProcess from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parseDiff } from "./diff.ts";
-import { assertPrRef, assertSafeRef, captureDiff, capturePrDiff, ensureCommit, fileContent, resolveBase } from "./git.ts";
+import { assertPrRef, assertSafeRef, captureDiff, capturePr, capturePrDiff, ensureCommit, fileContent, resolveBase } from "./git.ts";
 
 test("assertSafeRef rejects flag-smuggling refs, accepts real refs", () => {
   expect(() => assertSafeRef("-O/tmp/x")).toThrow();
@@ -103,6 +104,76 @@ test("ensureCommit resolves an existing commit, fails open for an unknown one", 
     // No such object; the fetch fallbacks run `git fetch origin` in a repo with
     // NO remote and degrade quietly (allowFail) → false.
     expect(ensureCommit(dir, "deadbeef".repeat(5))).toBe(false);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test.serial("capturePr parses gh pr view JSON when available", () => {
+  const dir = mkdtempSync(join(tmpdir(), "rb-git-"));
+  try {
+    const git = (...a: string[]) => execFileSync("git", a, { cwd: dir, encoding: "utf8" });
+    git("init", "-q");
+    git("config", "user.email", "t@t.t");
+    git("config", "user.name", "t");
+    git("config", "commit.gpgsign", "false");
+    writeFileSync(join(dir, "f.ts"), "x\n");
+    git("add", "-A");
+    git("commit", "-q", "-m", "base");
+
+    // Bun's execFileSync ignores runtime PATH mutations (oven-sh/bun#29237), so a
+    // fake `gh` on PATH is not picked up. Intercept the gh call instead.
+    const origExec = childProcess.execFileSync;
+    const ghSpy = spyOn(childProcess, "execFileSync").mockImplementation(
+      ((cmd: string, args?: readonly string[], opts?: Parameters<typeof origExec>[2]) => {
+        if (cmd === "gh") {
+          return '{"title":"T","body":"B","author":{"login":"alice"},"baseRefName":"main","headRefName":"feat"}\n';
+        }
+        return origExec(cmd, args ?? [], opts);
+      }) as typeof origExec,
+    );
+
+    const pr = capturePr(dir, "fallback-base");
+    expect(pr.title).toBe("T");
+    expect(pr.author).toBe("alice");
+    expect(pr.base).toBe("main");
+    expect(pr.head).toBe("feat");
+    ghSpy.mockRestore();
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test.serial("capturePr falls back to local git when gh yields no JSON", () => {
+  const dir = mkdtempSync(join(tmpdir(), "rb-git-"));
+  try {
+    const git = (...a: string[]) => execFileSync("git", a, { cwd: dir, encoding: "utf8" });
+    git("init", "-q");
+    git("config", "user.email", "t@t.t");
+    git("config", "user.name", "t");
+    git("config", "commit.gpgsign", "false");
+    writeFileSync(join(dir, "f.ts"), "x\n");
+    git("add", "-A");
+    git("commit", "-q", "-m", "base");
+    writeFileSync(join(dir, "f.ts"), "y\n");
+    git("add", "-A");
+    git("commit", "-q", "-m", "my subject");
+
+    // gh yields no JSON → capturePr must fall back to local git (last commit
+    // subject as title, `git config user.name` as author). Intercept gh the same
+    // way as the happy path; delegate real git calls.
+    const origExec = childProcess.execFileSync;
+    const ghSpy = spyOn(childProcess, "execFileSync").mockImplementation(
+      ((cmd: string, args?: readonly string[], opts?: Parameters<typeof origExec>[2]) => {
+        if (cmd === "gh") return ""; // no JSON → fallback
+        return origExec(cmd, args ?? [], opts);
+      }) as typeof origExec,
+    );
+
+    const pr = capturePr(dir, "fallback-base");
+    expect(pr.title).toBe("my subject");
+    expect(pr.author).toBe("t");
+    ghSpy.mockRestore();
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
