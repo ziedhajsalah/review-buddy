@@ -6,7 +6,7 @@ import { DisplaySettingsBar } from "./DisplaySettingsBar.tsx";
 import { FileDiffCard } from "./FileDiffCard.tsx";
 import { Markdown } from "./Markdown.tsx";
 import { useDisplaySettings } from "../settings.ts";
-import { useViewedFiles } from "../lib/viewed.ts";
+import { useViewedFiles, clearViewedFiles } from "../lib/viewed.ts";
 import { postDone } from "../api.ts";
 
 export function ChapterReview({
@@ -21,14 +21,19 @@ export function ChapterReview({
   onExit: () => void;
 }) {
   const [settings, updateSettings] = useDisplaySettings();
-  const [viewed, toggleViewed] = useViewedFiles();
+  const chapters = review.chapters;
+  // -1 only when there is no chapter at `position`; the `if (!chapter)` guard
+  // below returns before this bucket is ever read or toggled. The fallback
+  // exists solely to keep useViewedFiles unconditional (a hook can't run after
+  // that guard).
+  const chapterIndex = chapters[position]?.index ?? -1;
+  const [viewed, toggleViewed] = useViewedFiles(chapterIndex);
   const [filter, setFilter] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const diffScrollRef = useRef<HTMLDivElement>(null);
 
-  const chapters = review.chapters;
   const chapter = chapters[position];
 
   // Scroll the diff pane to top and reset file filter whenever the chapter changes.
@@ -59,6 +64,7 @@ export function ChapterReview({
     setSubmitError(null);
     try {
       await postDone();
+      clearViewedFiles();
       setSubmitted(true);
     } catch (e) {
       setSubmitError(String(e));
