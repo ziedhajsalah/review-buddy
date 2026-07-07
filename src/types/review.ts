@@ -159,6 +159,12 @@ export interface ResolvedReview {
   prologue: Prologue;
   stats: ReviewStats;
   chapters: ResolvedChapter[];
+  /**
+   * Resolution warnings — places the agent's narrative didn't map cleanly onto
+   * the real diff (unmatched anchors, files not in the diff, unsorted changes).
+   * Shown to the reviewer; empty when resolution was clean.
+   */
+  warnings: string[];
 }
 
 /* ------------------------------------------------------------------ */

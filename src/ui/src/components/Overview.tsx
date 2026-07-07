@@ -14,7 +14,8 @@ export function Overview({
   onBeginReview: (position: number) => void;
 }) {
   const [tab, setTab] = useState<Tab>("prologue");
-  const { pr, meta, prologue, stats, chapters } = review;
+  const { pr, meta, prologue, stats, chapters, warnings } = review;
+  const [warningsOpen, setWarningsOpen] = useState(warnings.length <= 3);
 
   return (
     <div className="mx-auto max-w-3xl px-6 py-10">
@@ -42,6 +43,41 @@ export function Overview({
           )}
         </div>
       </header>
+
+      {warnings.length > 0 && (
+        <div
+          className="mb-6 p-3"
+          style={{
+            border: "1px solid var(--rb-border)",
+            borderLeft: "3px solid #b54708",
+            borderRadius: "0.5rem",
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => setWarningsOpen((o) => !o)}
+            aria-expanded={warningsOpen}
+            className="flex w-full items-center justify-between text-left"
+          >
+            <span className="text-sm font-medium">
+              ⚠ {warnings.length} resolution note{warnings.length === 1 ? "" : "s"}
+            </span>
+            <span className="text-xs" style={{ color: "var(--rb-muted)" }}>
+              {warningsOpen ? "▾ Hide" : "▸ Show"}
+            </span>
+          </button>
+          {warningsOpen && (
+            <ul
+              className="mt-2 list-disc space-y-1 pl-5 text-sm"
+              style={{ color: "var(--rb-muted)" }}
+            >
+              {warnings.map((w, i) => (
+                <li key={i}>{w}</li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="mb-4 flex gap-1 border-b" style={{ borderColor: "var(--rb-border)" }}>

@@ -132,6 +132,7 @@ describe("resolveReview", () => {
     expect(paths).toEqual(["gone.txt", "logo.png", "src/dashboard/useSport.ts"]);
     expect(unsorted!.index).toBe(3);
     expect(warnings.some((w) => w.includes("Unsorted"))).toBe(true);
+    expect(review.warnings).toEqual(warnings);
   });
 
   test("overall stats reflect the entire diff", () => {
