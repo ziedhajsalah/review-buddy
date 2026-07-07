@@ -19,9 +19,7 @@
     "verify:ci": "bun run test && bun run typecheck && bun run build:ui"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.12.0",
-    "@pierre/diffs": "1.2.8",
-    "diff": "^8.0.4"
+    "@modelcontextprotocol/sdk": "^1.12.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
