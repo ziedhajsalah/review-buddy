@@ -54,7 +54,7 @@ function resolvedFileFrom(file: ParsedFile, hunks: ParsedHunk[]): ResolvedFile {
     language: languageOf(file.path),
     hunks: hunks.map(toResolvedHunk),
     ...(file.binary ? { binary: true } : {}),
-    ...(file.oldPath ? { old_path: file.oldPath } : {}),
+    ...(file.changeType === "renamed" && file.oldPath ? { old_path: file.oldPath } : {}),
   };
 }
 

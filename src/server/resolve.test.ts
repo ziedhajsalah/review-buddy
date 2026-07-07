@@ -103,6 +103,7 @@ describe("resolveReview", () => {
     const ch1 = review.chapters[0]!;
     expect(ch1.fileCount).toBe(1);
     const file = ch1.files[0]!;
+    expect(file.old_path).toBeUndefined();
     expect(file.language).toBe("typescript");
     expect(file.hunks).toHaveLength(1);
     expect(file.hunks[0]!.header).toBe(
