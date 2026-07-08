@@ -8,6 +8,8 @@ import { Markdown } from "./Markdown.tsx";
 import { useDisplaySettings } from "../settings.ts";
 import { useViewedFiles, clearViewedFiles } from "../lib/viewed.ts";
 import { postDone, fetchConfig } from "../api.ts";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 export function ChapterReview({
   review,
@@ -86,7 +88,7 @@ export function ChapterReview({
 
   if (submitted) {
     return (
-      <div className="grid h-full place-items-center" style={{ color: "var(--rb-muted)" }}>
+      <div className="grid h-full place-items-center text-muted-foreground">
         Review submitted — you can close this tab.
       </div>
     );
@@ -95,54 +97,47 @@ export function ChapterReview({
   return (
     <div className="flex h-full flex-col">
       {/* Top bar */}
-      <header
-        className="flex items-center justify-between gap-3 border-b px-4 py-2.5"
-        style={{ borderColor: "var(--rb-border)" }}
-      >
-        <button onClick={onExit} className="text-sm hover:underline" style={{ color: "var(--rb-muted)" }}>
+      <header className="flex items-center justify-between gap-3 border-b border-border px-4 py-2.5">
+        <Button variant="ghost" size="sm" onClick={onExit} className="text-muted-foreground">
           ← Overview
-        </button>
+        </Button>
         <div className="flex items-center gap-3 text-sm">
-          <button
+          <Button
+            variant="outline"
+            size="sm"
             onClick={() => prev && onNavigate(position - 1)}
             disabled={!prev}
-            className="rounded px-2 py-1 disabled:opacity-30"
-            style={{ border: "1px solid var(--rb-border)" }}
           >
             ← Prev
-          </button>
-          <span style={{ color: "var(--rb-muted)" }}>
+          </Button>
+          <span className="text-muted-foreground">
             Chapter {position + 1} of {chapters.length}
           </span>
-          <button
+          <Button
+            variant="outline"
+            size="sm"
             onClick={() => next && onNavigate(position + 1)}
             disabled={!next}
-            className="rounded px-2 py-1 disabled:opacity-30"
-            style={{ border: "1px solid var(--rb-border)" }}
           >
             Next →
-          </button>
+          </Button>
         </div>
         <div className="flex flex-col items-end gap-1">
           <div className="flex items-center gap-2">
             {roundtrip && (
-              <button
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={() => setRequesting((v) => !v)}
                 disabled={submitting}
-                className="rounded-lg px-4 py-1.5 text-sm font-medium disabled:opacity-50"
-                style={{ border: "1px solid var(--rb-border)", color: "var(--color-risk-high)" }}
+                className="text-[var(--color-risk-high)]"
               >
                 Request changes
-              </button>
+              </Button>
             )}
-            <button
-              onClick={done}
-              disabled={submitting}
-              className="rounded-lg px-4 py-1.5 text-sm font-medium text-white disabled:opacity-50"
-              style={{ background: "var(--rb-accent)" }}
-            >
+            <Button size="sm" onClick={done} disabled={submitting}>
               {submitting ? "Submitting…" : "Done"}
-            </button>
+            </Button>
           </div>
           {roundtrip && requesting && (
             <div className="flex w-72 flex-col gap-1">
@@ -151,23 +146,21 @@ export function ChapterReview({
                 onChange={(e) => setSummary(e.target.value)}
                 placeholder="What should change?"
                 rows={3}
-                className="w-full rounded-md border px-2 py-1 text-sm"
-                style={{ borderColor: "var(--rb-border)", background: "var(--rb-bg)" }}
+                className="w-full rounded-md border border-border bg-background px-2 py-1 text-sm"
               />
-              <button
+              <Button
+                size="sm"
+                variant="destructive"
                 onClick={requestChanges}
                 disabled={submitting}
-                className="self-end rounded-lg px-3 py-1 text-xs font-medium text-white disabled:opacity-50"
-                style={{ background: "var(--color-risk-high)" }}
+                className="self-end"
               >
                 Submit request
-              </button>
+              </Button>
             </div>
           )}
           {submitError && (
-            <p className="text-xs" style={{ color: "var(--color-risk-high)" }}>
-              {submitError}
-            </p>
+            <p className="text-xs text-[var(--color-risk-high)]">{submitError}</p>
           )}
         </div>
       </header>
@@ -175,43 +168,37 @@ export function ChapterReview({
       {/* Split pane */}
       <div className="flex min-h-0 flex-1">
         {/* Left context panel */}
-        <aside
-          className="w-80 shrink-0 overflow-y-auto border-r p-4"
-          style={{ borderColor: "var(--rb-border)", background: "var(--rb-panel)" }}
-        >
+        <aside className="w-80 shrink-0 overflow-y-auto border-r border-border bg-card p-4">
           <div className="mb-2 flex items-center gap-2">
             <RiskBadge risk={chapter.risk} />
             <DiffStat additions={chapter.additions} deletions={chapter.deletions} />
           </div>
           <h1 className="text-lg font-semibold leading-snug">{chapter.title}</h1>
-          <p className="mt-2 text-sm leading-relaxed" style={{ color: "var(--rb-muted)" }}>
-            <span className="font-semibold" style={{ color: "var(--rb-fg)" }}>
-              Risk:{" "}
-            </span>
+          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+            <span className="font-semibold text-foreground">Risk: </span>
             <Markdown value={chapter.risk_reason} variant="inline" className="inline" />
           </p>
           <div className="mt-3 text-sm">
             <Markdown value={chapter.description} />
           </div>
 
-          <h2 className="mt-5 mb-2 text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--rb-muted)" }}>
+          <h2 className="mt-5 mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             {chapter.files.length} file{chapter.files.length === 1 ? "" : "s"}
           </h2>
           <input
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
             placeholder="Filter files…"
-            className="mb-2 w-full rounded-md border px-2 py-1 text-sm"
-            style={{ borderColor: "var(--rb-border)", background: "var(--rb-bg)" }}
+            className="mb-2 w-full rounded-md border border-border bg-background px-2 py-1 text-sm"
           />
           <ul className="space-y-0.5">
             {files.map((f) => (
               <li key={f.path}>
                 <button
                   onClick={() => scrollToFile(f.path)}
-                  className="flex w-full items-center justify-between gap-2 rounded px-2 py-1 text-left text-xs hover:bg-[var(--rb-bg)]"
+                  className="flex w-full items-center justify-between gap-2 rounded px-2 py-1 text-left text-xs hover:bg-background"
                 >
-                  <span className="truncate font-mono" style={{ opacity: viewed.has(f.path) ? 0.5 : 1 }}>
+                  <span className={cn("truncate font-mono", viewed.has(f.path) && "opacity-50")}>
                     {viewed.has(f.path) ? "✓ " : ""}
                     {f.path.split("/").pop()}
                   </span>
@@ -242,7 +229,7 @@ export function ChapterReview({
                 </div>
               ))}
               {files.length === 0 && (
-                <p className="p-8 text-center text-sm" style={{ color: "var(--rb-muted)" }}>
+                <p className="p-8 text-center text-sm text-muted-foreground">
                   No files match “{filter}”.
                 </p>
               )}

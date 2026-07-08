@@ -16,7 +16,7 @@ export class ErrorBoundary extends Component<Props, State> {
       return (
         <div className="mx-auto max-w-xl p-10 text-center">
           <h1 className="mb-2 text-lg font-semibold">Something went wrong rendering the review</h1>
-          <p className="font-mono text-sm" style={{ color: "var(--rb-muted)" }}>
+          <p className="font-mono text-sm text-muted-foreground">
             {String(this.state.error)}
           </p>
         </div>

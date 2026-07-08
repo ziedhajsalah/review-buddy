@@ -19,7 +19,7 @@ export function App() {
     return (
       <div className="mx-auto max-w-xl p-10 text-center">
         <h1 className="mb-2 text-lg font-semibold">Couldn’t load the review</h1>
-        <p className="font-mono text-sm" style={{ color: "var(--rb-muted)" }}>
+        <p className="font-mono text-sm text-muted-foreground">
           {error}
         </p>
       </div>
@@ -28,7 +28,7 @@ export function App() {
 
   if (!review) {
     return (
-      <div className="grid h-full place-items-center" style={{ color: "var(--rb-muted)" }}>
+      <div className="grid h-full place-items-center text-muted-foreground">
         Loading review…
       </div>
     );

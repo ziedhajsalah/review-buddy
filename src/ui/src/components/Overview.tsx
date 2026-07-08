@@ -3,6 +3,9 @@ import type { ResolvedReview } from "../../../types/review.ts";
 import { RiskBadge } from "./RiskBadge.tsx";
 import { DiffStat } from "./DiffStat.tsx";
 import { Markdown } from "./Markdown.tsx";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
 type Tab = "prologue" | "description";
 
@@ -22,7 +25,7 @@ export function Overview({
       {/* PR header */}
       <header className="mb-6">
         <h1 className="text-2xl font-semibold tracking-tight">{pr.title || "Untitled review"}</h1>
-        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm" style={{ color: "var(--rb-muted)" }}>
+        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
           <span>{pr.author || "unknown"}</span>
           <span aria-hidden>·</span>
           <span className="font-mono text-xs">
@@ -33,26 +36,19 @@ export function Overview({
           <span aria-hidden>·</span>
           <span>{stats.filesChanged} file{stats.filesChanged === 1 ? "" : "s"}</span>
           {meta.aiGenerated && (
-            <span
+            <Badge
+              variant="outline"
               className="rounded-full px-2 py-0.5 text-[0.68rem] font-semibold"
-              style={{ background: "var(--rb-panel)", border: "1px solid var(--rb-border)" }}
               title={`Prompt v${meta.promptVersion} · ${new Date(meta.generatedAt).toLocaleString()}`}
             >
               ✦ AI-generated · {meta.generatedBy}
-            </span>
+            </Badge>
           )}
         </div>
       </header>
 
       {warnings.length > 0 && (
-        <div
-          className="mb-6 p-3"
-          style={{
-            border: "1px solid var(--rb-border)",
-            borderLeft: "3px solid #b54708",
-            borderRadius: "0.5rem",
-          }}
-        >
+        <div className="mb-6 rounded-lg border border-border border-l-[3px] border-l-risk-medium p-3">
           <button
             type="button"
             onClick={() => setWarningsOpen((o) => !o)}
@@ -62,15 +58,12 @@ export function Overview({
             <span className="text-sm font-medium">
               ⚠ {warnings.length} resolution note{warnings.length === 1 ? "" : "s"}
             </span>
-            <span className="text-xs" style={{ color: "var(--rb-muted)" }}>
+            <span className="text-xs text-muted-foreground">
               {warningsOpen ? "▾ Hide" : "▸ Show"}
             </span>
           </button>
           {warningsOpen && (
-            <ul
-              className="mt-2 list-disc space-y-1 pl-5 text-sm"
-              style={{ color: "var(--rb-muted)" }}
-            >
+            <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
               {warnings.map((w, i) => (
                 <li key={i}>{w}</li>
               ))}
@@ -80,7 +73,7 @@ export function Overview({
       )}
 
       {/* Tabs */}
-      <div className="mb-4 flex gap-1 border-b" style={{ borderColor: "var(--rb-border)" }}>
+      <div className="mb-4 flex gap-1 border-b border-border">
         <TabButton active={tab === "prologue"} onClick={() => setTab("prologue")}>
           AI Prologue
         </TabButton>
@@ -102,7 +95,7 @@ export function Overview({
               {prologue.key_changes.map((k, i) => (
                 <li key={i} className="leading-relaxed">
                   <span className="font-semibold">{k.headline}</span>
-                  <span style={{ color: "var(--rb-muted)" }}>
+                  <span className="text-muted-foreground">
                     {" — "}
                     <Markdown value={k.detail} variant="inline" className="inline" />
                   </span>
@@ -113,10 +106,7 @@ export function Overview({
           <Block heading="Review focus">
             <p>
               <Markdown value={prologue.review_focus.summary} variant="inline" className="inline" />{" "}
-              <code
-                className="rounded px-1.5 py-0.5 font-mono text-xs"
-                style={{ background: "var(--rb-panel)" }}
-              >
+              <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
                 {prologue.review_focus.file}
               </code>
             </p>
@@ -127,26 +117,26 @@ export function Overview({
           {pr.description ? (
             <Markdown value={pr.description} className="text-sm" />
           ) : (
-            <p style={{ color: "var(--rb-muted)" }}>No PR description available.</p>
+            <p className="text-muted-foreground">No PR description available.</p>
           )}
         </section>
       )}
 
       {/* Chapter list */}
-      <h2 className="mt-10 mb-3 text-sm font-semibold uppercase tracking-wide" style={{ color: "var(--rb-muted)" }}>
+      <h2 className="mt-10 mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
         {chapters.length} chapter{chapters.length === 1 ? "" : "s"}
       </h2>
       <ol className="space-y-2.5">
         {chapters.map((ch, i) => (
           <li key={ch.index}>
             <button
+              type="button"
               onClick={() => onBeginReview(i)}
-              className="w-full rounded-xl border p-4 text-left transition hover:shadow-sm"
-              style={{ borderColor: "var(--rb-border)", background: "var(--rb-panel)" }}
+              className="w-full rounded-xl border border-border bg-card p-4 text-left transition hover:shadow-sm"
             >
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2.5">
-                  <span className="font-mono text-xs" style={{ color: "var(--rb-muted)" }}>
+                  <span className="font-mono text-xs text-muted-foreground">
                     {String(ch.index).padStart(2, "0")}
                   </span>
                   <RiskBadge risk={ch.risk} />
@@ -154,12 +144,12 @@ export function Overview({
                 </div>
                 <div className="flex items-center gap-3 whitespace-nowrap">
                   <DiffStat additions={ch.additions} deletions={ch.deletions} />
-                  <span className="text-xs" style={{ color: "var(--rb-muted)" }}>
+                  <span className="text-xs text-muted-foreground">
                     {ch.fileCount} file{ch.fileCount === 1 ? "" : "s"}
                   </span>
                 </div>
               </div>
-              <p className="mt-2 line-clamp-2 text-sm" style={{ color: "var(--rb-muted)" }}>
+              <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">
                 <Markdown value={ch.description} variant="inline" className="inline" />
               </p>
             </button>
@@ -167,14 +157,14 @@ export function Overview({
         ))}
       </ol>
 
-      <button
+      <Button
         onClick={() => onBeginReview(0)}
         disabled={chapters.length === 0}
-        className="mt-8 rounded-lg px-5 py-2.5 font-medium text-white transition disabled:cursor-not-allowed disabled:opacity-40"
-        style={{ background: "var(--rb-accent)" }}
+        size="lg"
+        className="mt-8"
       >
         Begin review →
-      </button>
+      </Button>
     </div>
   );
 }
@@ -191,11 +181,10 @@ function TabButton({
   return (
     <button
       onClick={onClick}
-      className="-mb-px border-b-2 px-3 py-2 text-sm font-medium transition"
-      style={{
-        borderColor: active ? "var(--rb-accent)" : "transparent",
-        color: active ? "var(--rb-fg)" : "var(--rb-muted)",
-      }}
+      className={cn(
+        "-mb-px border-b-2 px-3 py-2 text-sm font-medium transition",
+        active ? "border-primary text-foreground" : "border-transparent text-muted-foreground",
+      )}
     >
       {children}
     </button>
@@ -205,7 +194,7 @@ function TabButton({
 function Block({ heading, children }: { heading: string; children: React.ReactNode }) {
   return (
     <div>
-      <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--rb-muted)" }}>
+      <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
         {heading}
       </h3>
       <div className="text-[0.95rem] leading-relaxed">{children}</div>
