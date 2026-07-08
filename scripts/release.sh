@@ -309,6 +309,7 @@ main() {
   # -- Execute or preview ---------------------------------------------------
 
   if is_dry_run; then
+    step "Rebuild the committed viewer (src/ui/dist) and stage it with the release"
     step "Write ${version} into ${VERSION_FILES[*]}"
     step "Verify every version file agrees"
     step "Commit on ${develop_branch}: chore(release): ${tag_name}"
@@ -323,6 +324,15 @@ main() {
       step "Skip GitHub Release (gh not installed or not authenticated)"
     fi
   else
+    # Rebuild the committed viewer so every release ships current bytes. The
+    # build is deterministic (content-hashed chunks), so this is a no-op stage
+    # when src/ui/dist is already fresh; when UI source moved ahead of the
+    # committed artifact, it brings dist up to date (plan 016). `bun` is only
+    # required for a real release, not for a dry-run preview.
+    require_command bun
+    (cd "$REPO_ROOT/src/ui" && bun install --frozen-lockfile) && bun run build:ui
+    step "Rebuild the committed viewer (src/ui/dist)"
+
     for f in "${VERSION_FILES[@]}"; do
       write_version_to "$f" "$version"
     done
@@ -334,7 +344,7 @@ main() {
     done
     step "Verify every version file agrees"
 
-    git add "${VERSION_FILES[@]}"
+    git add "${VERSION_FILES[@]}" src/ui/dist
     if git diff --cached --quiet; then
       log_error "No staged changes — files may already be at $version"
       exit 1

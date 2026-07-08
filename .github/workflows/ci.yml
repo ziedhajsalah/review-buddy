@@ -15,5 +15,8 @@ jobs:
         run: bun install --frozen-lockfile
       - name: Install (UI)
         run: bun install --frozen-lockfile --cwd src/ui
-      - name: Verify (tests + typechecks + UI build)
+      # verify:ci ends with verify:dist-fresh: after build:ui rebuilds the
+      # committed viewer (plan 016), it fails if src/ui/dist drifted from git —
+      # i.e. a PR changed UI source without committing the rebuilt artifact.
+      - name: Verify (tests + typechecks + UI build + committed-viewer freshness)
         run: bun run verify:ci

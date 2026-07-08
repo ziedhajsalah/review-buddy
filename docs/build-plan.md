@@ -11,8 +11,9 @@ orientation read `CLAUDE.md` and `docs/ARCHITECTURE.md`; for install/dev see
 - **MCP server:** `@modelcontextprotocol/sdk` (TypeScript) exposing one tool,
   `submit_review`, whose `inputSchema` is `schemas/review.schema.json`.
 - **UI:** React 19 + Vite + Tailwind v4; diffs via `@pierre/diffs` with syntax
-  highlighting by Shiki (`shiki-js`). A single self-contained HTML bundle
-  (`vite-plugin-singlefile`) is still deferred — see Open questions.
+  highlighting by Shiki (`shiki-js`). The build is **committed** to the repo
+  (`src/ui/dist/`) so install needs no build step — see
+  `docs/DESIGN-prebuilt-distribution.md`.
 - **Diff parsing:** we parse `git diff` ourselves (`src/server/`); word-level
   intra-line highlighting is done client-side by `@pierre/diffs`.
 - **HTTP server:** `Bun.serve` for `/api/*` — loopback-only bind with a
@@ -72,12 +73,17 @@ path (`parseDiffFromFile` → `<FileDiff expandUnchanged>`); see
 
 ## Open questions (still open)
 
-- **Single-file HTML / prebuilt distribution:** ship the viewer as one
-  self-contained HTML (`vite-plugin-singlefile`) and/or prebuilt, so install can
-  skip the `bun run build` step.
+- **Runtime grammar serving (future optimization):** the committed artifact
+  carries ~9.9 MB of Shiki grammar chunks. If repo size ever hurts, externalize
+  them and serve from the installed `shiki` package at runtime (users run
+  `bun install` anyway), committing only the ~870 KB core. Deferred as fragile
+  build-surgery not worth the cost today — see `docs/DESIGN-prebuilt-distribution.md`.
 
 Settled since planning: stack = Bun + `@pierre/diffs`/Shiki; distribution =
-Claude Code plugin marketplace; diff base = worktree/pr/branch `source` routing;
+Claude Code plugin marketplace with a **committed prebuilt viewer** (plan 016 —
+multi-file `src/ui/dist/`, chosen over `vite-plugin-singlefile` because the
+grammar payload made a single file ~9.9 MB and our own server already serves the
+`assets/*` chunks); diff base = worktree/pr/branch `source` routing;
 viewed-state key = per `(chapter, file)`.
 
 ## Reference files in Plannotator (`~/code/plannotator`)
