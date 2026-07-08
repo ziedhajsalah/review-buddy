@@ -35,3 +35,15 @@ export async function postDone(
 export async function fetchConfig(): Promise<{ roundtrip: boolean }> {
   return getJSON<{ roundtrip: boolean }>("/api/config");
 }
+
+export interface FileContent {
+  path: string;
+  side: "base" | "head";
+  language: string;
+  content: string;
+}
+
+/** Full file bytes for expansion (source C). content === "" means unavailable. */
+export function fetchFileContent(path: string, side: "base" | "head"): Promise<FileContent> {
+  return getJSON<FileContent>(`/api/file-content?path=${encodeURIComponent(path)}&side=${side}`);
+}
