@@ -67,11 +67,11 @@ export function ChapterReview({
       ?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-  const done = async () => {
+  const submit = async (result?: { verdict?: "approve" | "request_changes"; summary?: string }) => {
     setSubmitting(true);
     setSubmitError(null);
     try {
-      await postDone(roundtrip ? { verdict: "approve" } : undefined);
+      await postDone(result);
       clearViewedFiles();
       setSubmitted(true);
     } catch (e) {
@@ -81,19 +81,8 @@ export function ChapterReview({
     }
   };
 
-  const requestChanges = async () => {
-    setSubmitting(true);
-    setSubmitError(null);
-    try {
-      await postDone({ verdict: "request_changes", summary });
-      clearViewedFiles();
-      setSubmitted(true);
-    } catch (e) {
-      setSubmitError(String(e));
-    } finally {
-      setSubmitting(false);
-    }
-  };
+  const done = () => submit(roundtrip ? { verdict: "approve" } : undefined);
+  const requestChanges = () => submit({ verdict: "request_changes", summary });
 
   if (submitted) {
     return (

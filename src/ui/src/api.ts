@@ -20,13 +20,12 @@ export async function fetchReview(): Promise<ResolvedReview> {
 }
 
 export async function postDone(
-  arg?: string | { verdict?: "approve" | "request_changes"; summary?: string },
+  result: { verdict?: "approve" | "request_changes"; summary?: string } = {},
 ): Promise<void> {
-  const payload = typeof arg === "string" ? (arg ? { verdict: arg } : {}) : (arg ?? {});
   const res = await fetch("/api/done", {
     method: "POST",
     headers: { "content-type": "application/json", ...authHeaders },
-    body: JSON.stringify(payload),
+    body: JSON.stringify(result),
   });
   if (!res.ok) {
     throw new Error(`/api/done → ${res.status} ${res.statusText}`);

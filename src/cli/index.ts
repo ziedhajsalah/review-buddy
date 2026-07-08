@@ -44,13 +44,13 @@ function buildMeta(): ReviewMeta {
   };
 }
 
-/** Print the PreToolUse allow decision and exit (Phase 1: one-way viewer). */
-function allow(reason: string): never {
+/** Print a PreToolUse permission decision and exit. */
+function respond(permissionDecision: "allow" | "deny", reason: string): never {
   process.stdout.write(
     JSON.stringify({
       hookSpecificOutput: {
         hookEventName: "PreToolUse",
-        permissionDecision: "allow",
+        permissionDecision,
         permissionDecisionReason: reason,
       },
     }) + "\n",
@@ -58,18 +58,13 @@ function allow(reason: string): never {
   process.exit(0);
 }
 
-/** Print the PreToolUse deny decision and exit (Phase 2 round-trip spike). */
+/** Let the agent proceed (Phase 1 default; also every fail-open path). */
+function allow(reason: string): never {
+  respond("allow", reason);
+}
+/** Block the tool call and hand the reason back to the agent (Phase 2 spike). */
 function deny(reason: string): never {
-  process.stdout.write(
-    JSON.stringify({
-      hookSpecificOutput: {
-        hookEventName: "PreToolUse",
-        permissionDecision: "deny",
-        permissionDecisionReason: reason,
-      },
-    }) + "\n",
-  );
-  process.exit(0);
+  respond("deny", reason);
 }
 
 /**
