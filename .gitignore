@@ -3,8 +3,13 @@ dist/
 *.log
 .DS_Store
 
-# build output of the bundled review UI
-src/ui/dist/
-
 # TS incremental build info
 *.tsbuildinfo
+
+# Prebuilt viewer artifact — committed so `/plugin install` (a git clone) needs
+# no `bun run build` step (plan 016). Re-included despite the generic `dist/`
+# rule above. Rebuilt by CI + scripts/release.sh; grammar chunks are
+# content-hashed and stable, so a UI-source change only rewrites the small core
+# chunk, not the ~300 syntax grammars. Treated as generated in .gitattributes.
+!src/ui/dist/
+!src/ui/dist/**

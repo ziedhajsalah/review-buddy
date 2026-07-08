@@ -20,7 +20,7 @@ The agent provides **judgment and structure**; the actual diff bytes come from g
 - **Backend** — `submit_review` MCP tool, `/review` skill, and a blocking `PreToolUse` hook that captures the diff, resolves chapters (unclaimed changes bucketed into "Unsorted changes"), recomputes stats, and serves a hardened local app (loopback-only bind, Host-header validation, per-server token, path-traversal allowlist).
 - **Viewer** — Vite + React 19 + Tailwind v4 on [`@pierre/diffs`](https://www.npmjs.com/package/@pierre/diffs): Prologue/Description overview, risk-rated chapter cards, split-pane chapter review, unified/split diffs with word-level + syntax highlighting, per-file controls, cookie-persisted display prefs. Agent prose and the PR description render as **markdown** (`react-markdown` + GFM, no raw HTML).
 
-**Deferred to later phases:** viewed-state round-trip + verdict submission (Phase 2), GitHub collaboration / Activity / Chat (Phase 3), conversational assistant (Phase 4). In the viewer: shadow-DOM theming, single-file bundling.
+**Deferred to later phases:** viewed-state round-trip + verdict submission (Phase 2), GitHub collaboration / Activity / Chat (Phase 3), conversational assistant (Phase 4). In the viewer: shadow-DOM theming.
 
 ## Installation
 
@@ -35,14 +35,13 @@ Review Buddy is a **Claude Code plugin**. It registers an MCP server (`review-bu
 
 ### Install
 
-The browser viewer isn't shipped prebuilt, so you clone, build it once, then add the local checkout as a plugin marketplace.
+The viewer ships **prebuilt** in the repo, so there's no build step — clone, register, install.
 
 ```bash
-# 1. Clone and build the viewer
+# 1. Clone and install the backend deps (for the MCP server + hook)
 git clone https://github.com/ziedhajsalah/review-buddy
 cd review-buddy
 bun install
-( cd src/ui && bun install && bun run build )   # produces src/ui/dist — required
 ```
 
 ```text
@@ -52,8 +51,6 @@ bun install
 ```
 
 Restart Claude Code (or reload plugins) if prompted, so the MCP server and hook load.
-
-> If you skip the `bun run build` step the review still opens, but the viewer shows a placeholder instead of the diff UI.
 
 ### Use it
 
@@ -71,7 +68,7 @@ The agent tells the hook what it reviewed (working tree vs PR) so the hook captu
 ### Update / uninstall
 
 ```text
-/plugin marketplace update review-buddy    # after a git pull + rebuild
+/plugin marketplace update review-buddy    # after a git pull (viewer is prebuilt — no rebuild)
 /plugin uninstall review-buddy@review-buddy
 ```
 
@@ -105,8 +102,10 @@ bun run typecheck      # backend tsc
 cd src/ui
 bun install
 bun run dev            # viewer dev server (proxies /api → 127.0.0.1:5199)
-bun run build          # typecheck + production build
+bun run build          # typecheck + production build (writes the committed src/ui/dist)
 ```
+
+> **Contributors:** `src/ui/dist` is a **committed** prebuilt artifact (so installs need no build). If you change viewer source, rebuild (`cd src/ui && bun run build`) and commit the updated `src/ui/dist` in the same PR — CI fails otherwise. The build is deterministic and grammar chunks are content-hashed, so a typical UI change only rewrites the small core chunk. Reviewers verify the CI freshness check rather than reviewing the artifact bytes.
 
 See `docs/build-plan.md` for the phased task breakdown and `docs/review-contract.md` for the agent vs UI/server contracts.
 
