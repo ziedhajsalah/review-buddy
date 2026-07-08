@@ -155,8 +155,8 @@ async function runOpenReview(): Promise<never> {
     console.error(`[review-buddy] Viewer error: ${String(err)}`);
     allow("Review Buddy hit an error rendering the review; proceeding.");
   }
-  if (process.env.REVIEW_BUDDY_ROUNDTRIP && result.verdict === "request_changes") {
-    const note = result.summary?.trim();
+  if (process.env.REVIEW_BUDDY_ROUNDTRIP && result?.verdict === "request_changes") {
+    const note = typeof result.summary === "string" ? result.summary.trim() : "";
     deny(
       note
         ? `Reviewer requested changes:\n\n${note}`
