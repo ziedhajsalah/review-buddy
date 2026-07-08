@@ -1,5 +1,6 @@
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { cn } from "@/lib/utils";
 
 /**
  * Renders agent-authored (and PR) markdown prose with the app's own tokens, so
@@ -29,7 +30,7 @@ export function Markdown({
   const components = variant === "inline" ? INLINE_COMPONENTS : BLOCK_COMPONENTS;
 
   return (
-    <div className={className} style={{ overflowWrap: "anywhere" }}>
+    <div className={cn("wrap-anywhere", className)}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={components}
@@ -47,8 +48,7 @@ const link: Components["a"] = ({ children, href }) => (
     href={href}
     target="_blank"
     rel="noopener noreferrer"
-    className="underline underline-offset-2"
-    style={{ color: "var(--rb-accent)" }}
+    className="underline underline-offset-2 text-primary"
   >
     {children}
   </a>
@@ -64,12 +64,7 @@ const code: Components["code"] = ({ className, children }) => {
   if (isBlock) return <code className={className}>{children}</code>;
   return (
     <code
-      className="rounded px-1.5 py-0.5 font-mono text-[0.85em]"
-      style={{
-        color: "var(--rb-code-fg)",
-        background: "var(--rb-code-bg)",
-        border: "1px solid var(--rb-code-border)",
-      }}
+      className="rounded border border-[var(--rb-code-border)] bg-[var(--rb-code-bg)] px-1.5 py-0.5 font-mono text-[0.85em] text-[var(--rb-code-fg)]"
     >
       {children}
     </code>
@@ -83,7 +78,7 @@ const strong: Components["strong"] = ({ children }) => (
 const em: Components["em"] = ({ children }) => <em className="italic">{children}</em>;
 
 const del: Components["del"] = ({ children }) => (
-  <del style={{ color: "var(--rb-muted)" }}>{children}</del>
+  <del className="text-muted-foreground">{children}</del>
 );
 
 /** Shared inline marks — identical across both variants. */
@@ -106,39 +101,30 @@ const BLOCK_COMPONENTS: Components = {
   h3: ({ children }) => <h4 className="mt-3 mb-1 text-sm font-semibold first:mt-0">{children}</h4>,
   h4: ({ children }) => <h4 className="mt-3 mb-1 text-sm font-semibold first:mt-0">{children}</h4>,
   blockquote: ({ children }) => (
-    <blockquote
-      className="mb-2.5 border-l-2 pl-3 last:mb-0"
-      style={{ borderColor: "var(--rb-border)", color: "var(--rb-muted)" }}
-    >
+    <blockquote className="mb-2.5 border-l-2 border-border pl-3 text-muted-foreground last:mb-0">
       {children}
     </blockquote>
   ),
   // Fenced code blocks: styled monospace panel (inline code is handled above; a
   // fenced block arrives here as a <pre> wrapping a <code>, so keep <pre> plain).
   pre: ({ children }) => (
-    <pre
-      className="mb-2.5 overflow-x-auto rounded-md p-3 font-mono text-[0.8rem] leading-relaxed last:mb-0"
-      style={{ background: "var(--rb-panel)", border: "1px solid var(--rb-border)" }}
-    >
+    <pre className="mb-2.5 overflow-x-auto rounded-md border border-border bg-card p-3 font-mono text-[0.8rem] leading-relaxed last:mb-0">
       {children}
     </pre>
   ),
-  hr: () => <hr className="my-4" style={{ borderColor: "var(--rb-border)" }} />,
+  hr: () => <hr className="my-4 border-border" />,
   table: ({ children }) => (
     <div className="mb-2.5 overflow-x-auto last:mb-0">
       <table className="w-full border-collapse text-sm">{children}</table>
     </div>
   ),
   th: ({ children }) => (
-    <th
-      className="border px-2.5 py-1.5 text-left font-semibold"
-      style={{ borderColor: "var(--rb-border)", background: "var(--rb-panel)" }}
-    >
+    <th className="border border-border bg-card px-2.5 py-1.5 text-left font-semibold">
       {children}
     </th>
   ),
   td: ({ children }) => (
-    <td className="border px-2.5 py-1.5" style={{ borderColor: "var(--rb-border)" }}>
+    <td className="border border-border px-2.5 py-1.5">
       {children}
     </td>
   ),

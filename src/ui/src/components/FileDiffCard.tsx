@@ -1,4 +1,4 @@
-import { memo, useMemo, useState } from "react";
+import { memo, useId, useMemo, useState } from "react";
 import { PatchDiff, FileDiff } from "@pierre/diffs/react";
 import type { FileDiffMetadata } from "@pierre/diffs";
 import type { ResolvedFile, DisplaySettings } from "../../../types/review.ts";
@@ -7,6 +7,12 @@ import { DiffStat } from "./DiffStat.tsx";
 import { requiredSides, canExpand, buildExpandedDiff } from "../lib/expand.ts";
 import { fileToPatch } from "../lib/patch.ts";
 import { toDiffOptions } from "../settings.ts";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 
 const CHANGE_LABEL: Record<ResolvedFile["change_type"], string> = {
   added: "added",
@@ -39,6 +45,7 @@ export const FileDiffCard = memo(function FileDiffCard({
   const [expandedDiff, setExpandedDiff] = useState<FileDiffMetadata | null>(null);
   const [expandLoading, setExpandLoading] = useState(false);
   const [expandNotice, setExpandNotice] = useState<string | null>(null);
+  const viewedId = useId();
 
   const patch = useMemo(() => fileToPatch(file), [file]);
   const options = useMemo(() => toDiffOptions(settings), [settings]);
@@ -90,68 +97,66 @@ export const FileDiffCard = memo(function FileDiffCard({
   };
 
   return (
-    <section
-      className="overflow-hidden rounded-lg border"
-      style={{ borderColor: "var(--rb-border)", opacity: viewed ? 0.6 : 1 }}
-    >
+    <Card className={cn("gap-0 overflow-hidden py-0", viewed && "opacity-60")}>
       {/* File header */}
-      <header
-        className="flex items-center justify-between gap-3 border-b px-3 py-2"
-        style={{ borderColor: "var(--rb-border)", background: "var(--rb-panel)" }}
-      >
+      <header className="flex items-center justify-between gap-3 border-b border-border bg-card px-3 py-2">
         <div className="flex min-w-0 items-center gap-2">
-          <button
+          <Button
+            variant="ghost"
+            size="icon-xs"
             onClick={() => setCollapsed((c) => !c)}
-            className="shrink-0 font-mono text-xs"
-            style={{ color: "var(--rb-muted)" }}
+            className="shrink-0 font-mono text-xs text-muted-foreground"
             title={collapsed ? "Expand" : "Collapse"}
             aria-label={collapsed ? "Expand file" : "Collapse file"}
           >
             {collapsed ? "▸" : "▾"}
-          </button>
+          </Button>
           <span className="truncate font-mono text-sm" title={file.path}>
             {file.old_path ? `${file.old_path} → ${file.path}` : file.path}
           </span>
-          <span
-            className="shrink-0 rounded px-1.5 py-0.5 text-[0.62rem] uppercase"
-            style={{ background: "var(--rb-bg)", color: "var(--rb-muted)", border: "1px solid var(--rb-border)" }}
-          >
+          <Badge variant="outline" className="shrink-0 rounded px-1.5 py-0.5 text-[0.62rem] uppercase">
             {CHANGE_LABEL[file.change_type]}
-          </span>
+          </Badge>
         </div>
         <div className="flex shrink-0 items-center gap-3">
           <DiffStat additions={file.additions} deletions={file.deletions} />
-          <button onClick={copyName} className="text-xs hover:underline" style={{ color: "var(--rb-muted)" }}>
+          <Button variant="ghost" size="xs" onClick={copyName} className="text-muted-foreground">
             {copied ? "copied!" : "copy path"}
-          </button>
+          </Button>
           {!file.binary && (
-            <button
+            <Button
+              variant="ghost"
+              size="xs"
               onClick={toggleExpand}
               disabled={expandLoading}
-              className="text-xs hover:underline disabled:opacity-50"
-              style={{ color: "var(--rb-muted)" }}
+              className="text-muted-foreground"
             >
               {expandLoading ? "expanding…" : expanded ? "collapse to diff" : "expand"}
-            </button>
+            </Button>
           )}
-          <label className="flex cursor-pointer items-center gap-1 text-xs select-none" style={{ color: "var(--rb-muted)" }}>
-            <input type="checkbox" checked={viewed} onChange={() => onToggleViewed(file.path)} className="accent-[var(--rb-accent)]" />
-            viewed
-          </label>
+          <div className="flex items-center gap-1">
+            <Switch
+              id={viewedId}
+              size="sm"
+              checked={viewed}
+              onCheckedChange={() => onToggleViewed(file.path)}
+            />
+            <Label htmlFor={viewedId} className="cursor-pointer text-xs font-normal text-muted-foreground">
+              viewed
+            </Label>
+          </div>
         </div>
       </header>
 
       {!collapsed &&
         (file.binary ? (
-          <p className="p-4 text-sm" style={{ color: "var(--rb-muted)" }}>
+          <CardContent className="p-4 text-sm text-muted-foreground">
             Binary file — content not shown.
-          </p>
+          </CardContent>
         ) : (
           <>
             {expandNotice && (
-              <p className="px-3 py-2 text-xs" style={{ color: "var(--rb-muted)" }}>
-                {expandNotice}
-              </p>
+              <p className="px-3 py-2 text-xs text-muted-foreground">{expandNotice}</p>
             )}
             <div className="overflow-x-auto text-[13px]">
               {expanded && expandedDiff ? (
@@ -162,6 +167,6 @@ export const FileDiffCard = memo(function FileDiffCard({
             </div>
           </>
         ))}
-    </section>
+    </Card>
   );
 });

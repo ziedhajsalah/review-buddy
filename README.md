@@ -15,7 +15,7 @@ The agent provides **judgment and structure**; the actual diff bytes come from g
 
 ## Status
 
-**v0.1.0 — Phase 1 shipped** (one-way viewer). What's in:
+**v0.2.0 — Phase 1 complete** (one-way viewer), installed with zero build steps (the viewer ships prebuilt). What's in:
 
 - **Backend** — `submit_review` MCP tool, `/review` skill, and a blocking `PreToolUse` hook that captures the diff, resolves chapters (unclaimed changes bucketed into "Unsorted changes"), recomputes stats, and serves a hardened local app (loopback-only bind, Host-header validation, per-server token, path-traversal allowlist).
 - **Viewer** — Vite + React 19 + Tailwind v4 on [`@pierre/diffs`](https://www.npmjs.com/package/@pierre/diffs): Prologue/Description overview, risk-rated chapter cards, split-pane chapter review, unified/split diffs with word-level + syntax highlighting, per-file controls, cookie-persisted display prefs. Agent prose and the PR description render as **markdown** (`react-markdown` + GFM, no raw HTML).
@@ -72,6 +72,10 @@ The agent tells the hook what it reviewed (working tree vs PR) so the hook captu
 /plugin uninstall review-buddy@review-buddy
 ```
 
+### Troubleshooting
+
+Hitting an install or runtime snag (e.g. a Windows `EPERM` on install, `bun: command not found`, the browser not opening)? See [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md).
+
 ## Layout
 
 ```
@@ -104,6 +108,8 @@ bun install
 bun run dev            # viewer dev server (proxies /api → 127.0.0.1:5199)
 bun run build          # typecheck + production build (writes the committed src/ui/dist)
 ```
+
+Component stories live in `src/ui`. Run `cd src/ui && bun run storybook` for the dev catalog on port 6006, or `bun run build-storybook` for a static build.
 
 > **Contributors:** `src/ui/dist` is a **committed** prebuilt artifact (so installs need no build). If you change viewer source, rebuild (`cd src/ui && bun run build`) and commit the updated `src/ui/dist` in the same PR — CI fails otherwise. The build is deterministic and grammar chunks are content-hashed, so a typical UI change only rewrites the small core chunk. Reviewers verify the CI freshness check rather than reviewing the artifact bytes.
 

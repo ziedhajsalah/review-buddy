@@ -1,4 +1,8 @@
+import { useId } from "react";
 import type { DisplaySettings } from "../../../types/review.ts";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 /** Compact toolbar of the diff display controls (source D). */
 export function DisplaySettingsBar({
@@ -9,10 +13,7 @@ export function DisplaySettingsBar({
   update: (patch: Partial<DisplaySettings>) => void;
 }) {
   return (
-    <div
-      className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b px-4 py-2 text-xs"
-      style={{ borderColor: "var(--rb-border)", background: "var(--rb-panel)" }}
-    >
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-border bg-card px-4 py-2 text-xs">
       <Segmented
         label="Layout"
         value={settings.layout}
@@ -51,13 +52,13 @@ export function DisplaySettingsBar({
         ]}
         onChange={(v) => update({ theme: v })}
       />
-      <Toggle label="Wrap" checked={settings.wrap} onChange={(v) => update({ wrap: v })} />
-      <Toggle
+      <SettingSwitch label="Wrap" checked={settings.wrap} onChange={(v) => update({ wrap: v })} />
+      <SettingSwitch
         label="Line numbers"
         checked={settings.lineNumbers}
         onChange={(v) => update({ lineNumbers: v })}
       />
-      <Toggle
+      <SettingSwitch
         label="Backgrounds"
         checked={settings.backgrounds}
         onChange={(v) => update({ backgrounds: v })}
@@ -78,28 +79,34 @@ function Segmented<V extends string>({
   onChange: (v: V) => void;
 }) {
   return (
-    <label className="flex items-center gap-1.5">
-      <span style={{ color: "var(--rb-muted)" }}>{label}</span>
-      <span className="inline-flex overflow-hidden rounded-md border" style={{ borderColor: "var(--rb-border)" }}>
+    <div className="flex items-center gap-1.5">
+      <span className="text-muted-foreground">{label}</span>
+      <ToggleGroup
+        type="single"
+        value={value}
+        onValueChange={(v) => {
+          if (v) onChange(v as V);
+        }}
+        variant="outline"
+        size="sm"
+        spacing={0}
+        className="overflow-hidden rounded-md"
+      >
         {options.map(([val, text]) => (
-          <button
+          <ToggleGroupItem
             key={val}
-            onClick={() => onChange(val)}
-            className="px-2 py-1 transition"
-            style={{
-              background: value === val ? "var(--rb-accent)" : "transparent",
-              color: value === val ? "#fff" : "var(--rb-fg)",
-            }}
+            value={val}
+            className="rounded-none px-2 py-1 text-xs data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
           >
             {text}
-          </button>
+          </ToggleGroupItem>
         ))}
-      </span>
-    </label>
+      </ToggleGroup>
+    </div>
   );
 }
 
-function Toggle({
+function SettingSwitch({
   label,
   checked,
   onChange,
@@ -108,15 +115,13 @@ function Toggle({
   checked: boolean;
   onChange: (v: boolean) => void;
 }) {
+  const id = useId();
   return (
-    <label className="flex cursor-pointer items-center gap-1.5 select-none">
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
-        className="accent-[var(--rb-accent)]"
-      />
-      <span style={{ color: "var(--rb-muted)" }}>{label}</span>
-    </label>
+    <div className="flex items-center gap-1.5">
+      <Switch id={id} size="sm" checked={checked} onCheckedChange={onChange} />
+      <Label htmlFor={id} className="cursor-pointer text-xs font-normal text-muted-foreground">
+        {label}
+      </Label>
+    </div>
   );
 }

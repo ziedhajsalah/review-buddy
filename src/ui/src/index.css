@@ -67,3 +67,53 @@ body {
     --rb-code-border: #3a3145;
   }
 }
+
+/* shadcn/ui semantic tokens — mapped to --rb-* palette (media-query theme, no .dark class). */
+:root {
+  --background: var(--rb-bg);
+  --foreground: var(--rb-fg);
+  --card: var(--rb-panel);
+  --card-foreground: var(--rb-fg);
+  --popover: var(--rb-bg);
+  --popover-foreground: var(--rb-fg);
+  --primary: var(--rb-accent);
+  --primary-foreground: #ffffff;
+  --secondary: var(--rb-panel);
+  --secondary-foreground: var(--rb-fg);
+  --muted: var(--rb-panel);
+  --muted-foreground: var(--rb-muted);
+  --accent: var(--rb-panel);
+  --accent-foreground: var(--rb-fg);
+  --destructive: var(--color-risk-high);
+  --destructive-foreground: #ffffff;
+  --border: var(--rb-border);
+  --input: var(--rb-border);
+  --ring: var(--rb-accent);
+  --radius: 0.5rem;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}

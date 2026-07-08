@@ -1,19 +1,14 @@
 import type { Risk } from "../../../types/review.ts";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
-const STYLES: Record<Risk, { bg: string; fg: string }> = {
-  High: { bg: "var(--color-risk-high-bg)", fg: "var(--color-risk-high)" },
-  Medium: { bg: "var(--color-risk-medium-bg)", fg: "var(--color-risk-medium)" },
-  Low: { bg: "var(--color-risk-low-bg)", fg: "var(--color-risk-low)" },
+const RISK_CLASSES: Record<Risk, string> = {
+  High: "rounded-full px-2 py-0.5 text-[0.68rem] font-bold uppercase tracking-wide bg-[var(--color-risk-high-bg)] text-[var(--color-risk-high)]",
+  Medium:
+    "rounded-full px-2 py-0.5 text-[0.68rem] font-bold uppercase tracking-wide bg-[var(--color-risk-medium-bg)] text-[var(--color-risk-medium)]",
+  Low: "rounded-full px-2 py-0.5 text-[0.68rem] font-bold uppercase tracking-wide bg-[var(--color-risk-low-bg)] text-[var(--color-risk-low)]",
 };
 
 export function RiskBadge({ risk }: { risk: Risk }) {
-  const s = STYLES[risk];
-  return (
-    <span
-      className="inline-block rounded-full px-2 py-0.5 text-[0.68rem] font-bold uppercase tracking-wide"
-      style={{ background: s.bg, color: s.fg }}
-    >
-      {risk}
-    </span>
-  );
+  return <Badge className={cn("border-transparent", RISK_CLASSES[risk])}>{risk}</Badge>;
 }
