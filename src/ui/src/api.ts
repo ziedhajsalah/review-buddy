@@ -19,13 +19,19 @@ export async function fetchReview(): Promise<ResolvedReview> {
   return parseReview(data);
 }
 
-export async function postDone(verdict?: string): Promise<void> {
+export async function postDone(
+  result: { verdict?: "approve" | "request_changes"; summary?: string } = {},
+): Promise<void> {
   const res = await fetch("/api/done", {
     method: "POST",
     headers: { "content-type": "application/json", ...authHeaders },
-    body: JSON.stringify(verdict ? { verdict } : {}),
+    body: JSON.stringify(result),
   });
   if (!res.ok) {
     throw new Error(`/api/done → ${res.status} ${res.statusText}`);
   }
+}
+
+export async function fetchConfig(): Promise<{ roundtrip: boolean }> {
+  return getJSON<{ roundtrip: boolean }>("/api/config");
 }

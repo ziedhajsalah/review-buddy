@@ -73,6 +73,46 @@ const authed = (p: string, init: RequestInit = {}) =>
   });
 
 describe("HTTP server", () => {
+  test("GET /api/config reports the roundtrip flag (default false)", async () => {
+    const cfg = await (await authed("api/config")).json();
+    expect(cfg.roundtrip).toBe(false);
+  });
+
+  test("GET /api/config reports roundtrip:true when the server is started with it", async () => {
+    const agent: AgentReview = {
+      prologue: {
+        why: "w",
+        what: "x",
+        key_changes: [
+          { headline: "h1", detail: "d1" },
+          { headline: "h2", detail: "d2" },
+        ],
+        review_focus: { summary: "s", file: "app.ts" },
+      },
+      chapters: [
+        {
+          index: 1,
+          title: "Tweak b",
+          risk: "Low",
+          risk_reason: "trivial",
+          description: "changes b",
+          files: [{ path: "app.ts", change_type: "modified" }],
+        },
+      ],
+    };
+    const pr = capturePr(dir, base);
+    const { review } = resolveReview(agent, captureDiff(dir, base), META, pr);
+    const s = startServer({ review, cwd: dir, baseRef: base, roundtrip: true });
+    try {
+      const res = await fetch(`http://127.0.0.1:${s.port}/api/config`, {
+        headers: { "x-review-buddy-token": s.token },
+      });
+      expect((await res.json()).roundtrip).toBe(true);
+    } finally {
+      s.stop();
+    }
+  });
+
   test("GET /api/review returns the resolved review with real hunk content", async () => {
     const r = await (await authed("api/review")).json();
     expect(r.meta.generatedBy).toBe("test-model");
@@ -173,12 +213,12 @@ describe("HTTP server", () => {
       await authed("api/done", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ verdict: "ok" }),
+        body: JSON.stringify({ verdict: "approve" }),
       })
     ).json();
     expect(res.ok).toBe(true);
     const done = await server.done;
-    expect(done.verdict).toBe("ok");
+    expect(done.verdict).toBe("approve");
   });
 
   function startUiServer(uiDir: string): RunningServer {

@@ -61,6 +61,8 @@ The structuring prompt's original output format had the agent transcribe diff li
 | `/api/github/*` | — | Open PR, copy branch, CI status, reviewers (via `gh`). |
 | `/api/ai/*` | — | In-context conversational assistant. |
 
+**Round-trip design + spike:** see [`DESIGN-roundtrip.md`](./DESIGN-roundtrip.md). The Phase 2 verdict path is spiked (behind `REVIEW_BUDDY_ROUNDTRIP=1`) by carrying `{ verdict, summary }` on the existing **`POST /api/done`** — the hook returns `deny` + the summary as `permissionDecisionReason` — with **`GET /api/config`** exposing the flag to the client. The richer `/api/feedback` (per-line annotations) and `/api/file-viewed` remain the real Phase 2 build; the design doc is their brief.
+
 ## Hook design
 
 - Plugin `hooks.json` registers a **`PreToolUse`** hook. A plugin-bundled MCP server names its tools `mcp__plugin_<plugin>_<server>__<tool>`, so the real tool name is `mcp__plugin_review-buddy_review-buddy__submit_review` (a user-configured `.mcp.json` server would instead use `mcp__review-buddy__submit_review`). The matcher is an alternation covering both forms. See `examples/hooks.json` and [the MCP docs](https://code.claude.com/docs/en/mcp#plugin-provided-mcp-servers).

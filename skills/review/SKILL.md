@@ -84,3 +84,13 @@ the hook knows which diff to re-capture; for a PR it is REQUIRED (omitting it ma
 fall back to the local working tree, and the viewer shows an empty diff). Calling the tool
 opens the review in the reviewer's browser and pauses for their review. When control returns,
 briefly acknowledge and continue.
+
+### If your review is denied with feedback (Phase 2 spike)
+
+When `REVIEW_BUDDY_ROUNDTRIP` is enabled, the reviewer can **request changes**
+instead of approving. Your `submit_review` call is then **denied**, and the
+denial reason carries the reviewer's requested changes. When that happens: read
+the reason as review feedback, make the requested edits, then call
+`submit_review` **again with the same `source`**. Acknowledge what you changed
+between submissions. Re-submit at most **3 times**; if the reviewer still requests
+changes, stop and ask the human directly rather than looping.
