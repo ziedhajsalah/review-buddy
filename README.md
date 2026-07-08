@@ -72,6 +72,10 @@ The agent tells the hook what it reviewed (working tree vs PR) so the hook captu
 /plugin uninstall review-buddy@review-buddy
 ```
 
+### Troubleshooting
+
+Hitting an install or runtime snag (e.g. a Windows `EPERM` on install, `bun: command not found`, the browser not opening)? See [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md).
+
 ## Layout
 
 ```
