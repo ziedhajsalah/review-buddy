@@ -70,7 +70,7 @@ review-buddy/
 
 ## Phase 1 (shipped)
 
-Prologue + Description overview, chapter list, chapter review split-pane, and the diff viewer (unified/split, display settings, collapse "N unmodified lines", word-level granularity), with per-file controls (collapse / copy name / mark viewed locally). "Expand full file" is the one Phase 1 item still deferred — the backend serves `/api/file-content`, but wiring it into the viewer lands in a later phase.
+Prologue + Description overview, chapter list, chapter review split-pane, and the diff viewer (unified/split, display settings, collapse "N unmodified lines", word-level granularity), with per-file controls (collapse / copy name / **expand full file** / mark viewed locally). "Expand full file" wires `/api/file-content` into the viewer via `@pierre/diffs`' full-file render path (`parseDiffFromFile` → `<FileDiff expandUnchanged>`); see `docs/DESIGN-expand-full-file.md`. Still open: "N unmodified lines" expanders *between* hunks, and rename base-side expansion (needs an endpoint allowlist change).
 
 **Deferred to later phases** (per PRD): viewed-state persistence round-trip, verdict submission, GitHub collaboration (open PR, copy branch, reviewers, CI), Activity view, Chat, conversational AI assistant.
 

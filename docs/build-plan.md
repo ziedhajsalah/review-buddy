@@ -47,8 +47,11 @@ Chapters + diffs. No round-trip.
 6. ✅ **End-to-end** against real diffs — resolved hunks match `git diff`
    exactly (the point of reference-not-reproduce).
 
-Deferred within Phase 1: "expand full file" — the backend serves
-`/api/file-content`, but the viewer wiring is a later phase.
+"Expand full file" (Phase 1) shipped in plan 015 — the viewer fetches
+`/api/file-content` and renders the whole file via `@pierre/diffs`' full-file
+path (`parseDiffFromFile` → `<FileDiff expandUnchanged>`); see
+`docs/DESIGN-expand-full-file.md`. Still open: "N unmodified lines" expanders
+*between* hunks, and rename base-side expansion (needs an endpoint allowlist change).
 
 ## Phase 2 — Progress & round-trip
 
