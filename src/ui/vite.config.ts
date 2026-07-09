@@ -19,6 +19,11 @@ export default defineConfig({
       "@": path.resolve(dirname, "./src"),
     },
   },
+  // Pierre's worker script contains a dynamic import("shiki/wasm") branch;
+  // emit workers as ES modules so Vite can bundle that branch when needed.
+  worker: {
+    format: "es",
+  },
   build: {
     outDir: "dist",
     emptyOutDir: true,

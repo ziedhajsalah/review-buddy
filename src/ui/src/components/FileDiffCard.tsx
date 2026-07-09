@@ -22,12 +22,11 @@ const CHANGE_LABEL: Record<ResolvedFile["change_type"], string> = {
 };
 
 // Memoized on purpose: ChapterReview mounts one card per file and re-renders on
-// every filter keystroke / viewed toggle. Each card re-render synchronously
-// re-runs @pierre/diffs' main-thread render, so without memo one keystroke
-// re-highlights every diff. memo only works while its props stay referentially
-// stable — in particular `onToggleViewed` must be passed as a stable callback
-// (it takes the path so the parent can hand over `toggleViewed` directly rather
-// than allocating a per-render arrow). Do not re-wrap it in a closure.
+// every filter keystroke / viewed toggle. Without memo, one keystroke re-renders
+// every card (and re-queues worker highlights). memo only works while its props
+// stay referentially stable — in particular `onToggleViewed` must be passed as a
+// stable callback (it takes the path so the parent can hand over `toggleViewed`
+// directly rather than allocating a per-render arrow). Do not re-wrap it in a closure.
 export const FileDiffCard = memo(function FileDiffCard({
   file,
   settings,
@@ -160,9 +159,9 @@ export const FileDiffCard = memo(function FileDiffCard({
             )}
             <div className="overflow-x-auto text-[13px]">
               {expanded && expandedDiff ? (
-                <FileDiff fileDiff={expandedDiff} options={expandedOptions} disableWorkerPool />
+                <FileDiff fileDiff={expandedDiff} options={expandedOptions} />
               ) : (
-                <PatchDiff patch={patch} options={options} disableWorkerPool />
+                <PatchDiff patch={patch} options={options} />
               )}
             </div>
           </>

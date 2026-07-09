@@ -43,10 +43,8 @@ export function toDiffOptions(s: DisplaySettings): FileDiffOptions<undefined> {
     disableLineNumbers: !s.lineNumbers,
     disableBackground: !s.backgrounds,
     hunkSeparators: "line-info",
-    // Main-thread JS highlighter: no worker pool, no WASM fetch — keeps the
-    // build simple and single-file-friendly. Upgrade to WorkerPoolContextProvider
-    // later for large diffs.
-    preferredHighlighter: "shiki-js",
+    // Syntax highlighting runs in the worker pool (ReviewWorkerPoolProvider);
+    // these options control layout/labels only — tokenization stays off-thread.
     theme: THEME,
     ...(s.theme === "auto" ? {} : { themeType: s.theme }),
   };
