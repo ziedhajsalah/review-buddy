@@ -63,6 +63,25 @@ export interface RunningServer {
 
 const ALLOWED_HOSTS = new Set(["127.0.0.1", "localhost"]);
 
+// A verdict summary is short prose; anything larger is malformed/abusive.
+const MAX_DONE_BODY = 256 * 1024;
+
+// Self-only sources: the viewer is fully self-contained (no CDN/remote fetch),
+// so this blocks any exfiltration of rendered agent/diff content to a remote
+// host while keeping the app working. 'unsafe-inline' is limited to styles
+// (Shiki/Tailwind emit inline styles); scripts fall back to default-src 'self'
+// (external hashed modules OK, inline script blocked).
+const VIEWER_CSP =
+  "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; " +
+  "font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'";
+
+function withViewerHeaders(res: Response): Response {
+  res.headers.set("content-security-policy", VIEWER_CSP);
+  res.headers.set("x-content-type-options", "nosniff");
+  res.headers.set("referrer-policy", "no-referrer");
+  return res;
+}
+
 /** Constant-time string equality (hash first: equal length, no early exit). */
 function safeEqual(a: string, b: string): boolean {
   const ha = createHash("sha256").update(a).digest();
@@ -77,6 +96,7 @@ const json = (data: unknown, status = 200) =>
       "content-type": "application/json",
       "cache-control": "no-store",
       "referrer-policy": "no-referrer",
+      "x-content-type-options": "nosniff",
     },
   });
 
@@ -143,6 +163,8 @@ export function startServer(ctx: ServerContext): RunningServer {
       }
 
       if (pathname === "/api/done" && req.method === "POST") {
+        const len = Number(req.headers.get("content-length") ?? "0");
+        if (len > MAX_DONE_BODY) return json({ error: "body too large" }, 413);
         let body: DoneResult = {};
         try {
           body = (await req.json()) as DoneResult;
@@ -168,15 +190,21 @@ export function startServer(ctx: ServerContext): RunningServer {
         // Reject traversal before touching the filesystem.
         const safe = !rel.split("/").includes("..") && isInside(ctx.uiDir, rel);
         const file = join(ctx.uiDir, rel);
-        if (safe && existsSync(file)) return new Response(Bun.file(file));
+        if (safe && existsSync(file)) return withViewerHeaders(new Response(Bun.file(file)));
         // SPA fallback.
         const index = join(ctx.uiDir, "index.html");
-        if (existsSync(index)) return new Response(Bun.file(index));
+        if (existsSync(index)) return withViewerHeaders(new Response(Bun.file(index)));
       }
 
       if (pathname === "/") {
         return new Response(placeholderHtml(), {
-          headers: { "content-type": "text/html" },
+          headers: {
+            "content-type": "text/html",
+            "content-security-policy":
+              "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'",
+            "x-content-type-options": "nosniff",
+            "referrer-policy": "no-referrer",
+          },
         });
       }
 

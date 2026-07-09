@@ -216,7 +216,10 @@ export function fileContent(
 ): string {
   if (side === "head") {
     // PR mode: the reviewed state is a commit, not the local working tree.
-    if (headRef) return git(cwd, ["show", `${headRef}:${path}`], true);
+    if (headRef) {
+      assertSafeRef(headRef); // consistency with the base side — headRef is API/agent-derived
+      return git(cwd, ["show", `${headRef}:${path}`], true);
+    }
     if (headRef === null) return ""; // PR mode, content unavailable — never leak worktree bytes
     const abs = join(cwd, path);
     if (!existsSync(abs)) return "";

@@ -25,6 +25,12 @@ test("fileContent rejects an unsafe base ref before git runs", () => {
   expect(() => fileContent(".", "f", "base", "-Oevil")).toThrow();
 });
 
+test("fileContent (head) rejects a ref that smells like a flag", () => {
+  const repo = makeTempRepo("rb-headref-");
+  expect(() => fileContent(repo, "app.ts", "head", "HEAD", "-evil-flag")).toThrow("unsafe");
+  rmSync(repo, { recursive: true, force: true });
+});
+
 test("assertPrRef accepts a number or github PR URL, rejects the rest", () => {
   expect(() => assertPrRef("42")).not.toThrow();
   expect(() => assertPrRef("https://github.com/owner/repo/pull/7")).not.toThrow();

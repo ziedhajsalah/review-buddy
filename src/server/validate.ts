@@ -12,7 +12,7 @@ const Hunk = z.object({ old_start: z.number(), new_start: z.number() });
 const AgentFile = z.object({
   path: z.string(),
   change_type: z.string(),
-  hunks: z.array(Hunk).optional(),
+  hunks: z.array(Hunk).max(5000).optional(),
 });
 const Chapter = z.object({
   index: z.number().int().min(1),
@@ -20,7 +20,7 @@ const Chapter = z.object({
   risk: z.enum(["Low", "Medium", "High"]),
   risk_reason: z.string(),
   description: z.string(),
-  files: z.array(AgentFile).min(1),
+  files: z.array(AgentFile).min(1).max(2000),
 });
 const Source = z
   .object({
@@ -43,7 +43,7 @@ const Source = z
  *  ignored, not rejected. */
 export const AgentReviewSchema = z.object({
   prologue: Prologue,
-  chapters: z.array(Chapter).min(1),
+  chapters: z.array(Chapter).min(1).max(500),
   source: Source.optional(),
 });
 

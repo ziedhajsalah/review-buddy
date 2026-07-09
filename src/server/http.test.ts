@@ -203,9 +203,12 @@ describe("HTTP server", () => {
   });
 
   test("GET / serves the placeholder viewer (no token needed for the shell)", async () => {
-    const html = await (await fetch(server.url)).text();
+    const res = await fetch(server.url);
+    const html = await res.text();
     expect(html).toContain("Review Buddy");
     expect(html).toContain("/api/review");
+    expect(res.headers.get("content-security-policy")).toContain("default-src 'self'");
+    expect(res.headers.get("x-content-type-options")).toBe("nosniff");
   });
 
   test("POST /api/done unblocks the hook", async () => {
@@ -219,6 +222,51 @@ describe("HTTP server", () => {
     expect(res.ok).toBe(true);
     const done = await server.done;
     expect(done.verdict).toBe("approve");
+  });
+
+  test("POST /api/done rejects an oversized body (content-length guard)", async () => {
+    const agent: AgentReview = {
+      prologue: {
+        why: "w",
+        what: "x",
+        key_changes: [
+          { headline: "h1", detail: "d1" },
+          { headline: "h2", detail: "d2" },
+        ],
+        review_focus: { summary: "s", file: "app.ts" },
+      },
+      chapters: [
+        {
+          index: 1,
+          title: "Tweak b",
+          risk: "Low",
+          risk_reason: "trivial",
+          description: "changes b",
+          files: [{ path: "app.ts", change_type: "modified" }],
+        },
+      ],
+    };
+    const pr: PrMetadata = capturePr(dir, base);
+    const { review } = resolveReview(agent, captureDiff(dir, base), META, pr);
+    const s = startServer({ review, cwd: dir, baseRef: base });
+    try {
+      // fetch overwrites Content-Length from the real body — curl can forge it.
+      const proc = Bun.spawn([
+        "curl", "-s",
+        "-o", "/dev/null", "-w", "%{http_code}",
+        "-X", "POST",
+        "-H", "content-type: application/json",
+        "-H", `content-length: ${256 * 1024 + 1}`,
+        "-H", `x-review-buddy-token: ${s.token}`,
+        "-d", "{}",
+        `http://127.0.0.1:${s.port}/api/done`,
+      ]);
+      const code = (await new Response(proc.stdout).text()).trim();
+      await proc.exited;
+      expect(code).toBe("413");
+    } finally {
+      s.stop();
+    }
   });
 
   function startUiServer(uiDir: string): RunningServer {
@@ -256,12 +304,17 @@ describe("HTTP server", () => {
     writeFileSync(join(uiDir, "assets", "app.js"), "console.log('app')");
     const s = startUiServer(uiDir);
     try {
-      const index = await (await fetch(`http://127.0.0.1:${s.port}/`)).text();
+      const indexRes = await fetch(`http://127.0.0.1:${s.port}/`);
+      const index = await indexRes.text();
       expect(index).toContain("UI");
+      expect(indexRes.headers.get("content-security-policy")).toContain("default-src 'self'");
+      expect(indexRes.headers.get("x-content-type-options")).toBe("nosniff");
 
       const asset = await fetch(`http://127.0.0.1:${s.port}/assets/app.js`);
       expect(asset.status).toBe(200);
       expect(await asset.text()).toContain("console.log('app')");
+      expect(asset.headers.get("content-security-policy")).toContain("default-src 'self'");
+      expect(asset.headers.get("x-content-type-options")).toBe("nosniff");
     } finally {
       s.stop();
       rmSync(parent, { recursive: true, force: true });

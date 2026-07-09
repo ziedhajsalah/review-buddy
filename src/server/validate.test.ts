@@ -57,3 +57,8 @@ test("still accepts a valid pr source and absent source", () => {
   expect(validateAgentReview({ ...good, source: { type: "pr", ref: "42" } })).toBeNull();
   expect(validateAgentReview(good)).toBeNull();
 });
+
+test("rejects an absurd chapter count (size cap)", () => {
+  const many = Array.from({ length: 501 }, (_, i) => ({ ...good.chapters[0], index: i + 1 }));
+  expect(validateAgentReview({ ...good, chapters: many })).not.toBeNull();
+});
