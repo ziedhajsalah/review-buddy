@@ -5,7 +5,7 @@ import { join } from "node:path";
 import type { AgentReview } from "../types/review.ts";
 import { makeTempRepo, sampleReview, VIEWER_URL_RE } from "../test-helpers.ts";
 import { standaloneMode } from "./mode.ts";
-import { handleStandaloneSubmit, stopCurrentSession } from "./standalone.ts";
+import { handleStandaloneSubmit, makeShutdown, stopCurrentSession } from "./standalone.ts";
 
 // Capture each session URL from the console.error the session module emits —
 // lets blocking-mode tests reach the pending review without module internals.
@@ -37,6 +37,16 @@ afterAll(() => rmSync(dir, { recursive: true, force: true }));
 afterEach(() => stopCurrentSession());
 
 const review = (cwd?: string): AgentReview => sampleReview({ cwd });
+
+test("makeShutdown stops the session and exits exactly once (idempotent)", () => {
+  let exits = 0;
+  const shutdown = makeShutdown(() => {
+    exits++;
+  });
+  shutdown();
+  shutdown(); // second call must be a no-op
+  expect(exits).toBe(1);
+});
 
 test("standaloneMode: argv flag parsing", () => {
   const argv = (...args: string[]) => ["bun", "server.ts", ...args];

@@ -96,6 +96,21 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
 });
 
 await server.connect(new StdioServerTransport());
+
+// Standalone modes keep a viewer alive inside this long-lived process. Tie MCP
+// client disconnect + termination signals to a clean shutdown so the server (and
+// its port) can't outlive the client. Off (Claude Code) mode has no long-lived
+// viewer — the hook owns the lifecycle — so this only applies to standalone.
+if (MODE !== "off") {
+  const { makeShutdown } = await import("./standalone.ts");
+  const shutdown = makeShutdown();
+  server.onclose = shutdown;
+  process.stdin.on("end", shutdown);
+  process.stdin.on("close", shutdown);
+  process.on("SIGINT", shutdown);
+  process.on("SIGTERM", shutdown);
+}
+
 console.error(
   `[review-buddy] MCP server ready (tool: submit_review${MODE !== "off" ? `, standalone: ${MODE}` : ""}).`,
 );

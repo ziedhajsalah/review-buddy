@@ -45,6 +45,23 @@ export function stopCurrentSession(): void {
   current = undefined;
 }
 
+/**
+ * Build an idempotent shutdown that stops the live viewer then exits. The MCP
+ * server wires this to client-disconnect + termination signals so a detached
+ * standalone review can't outlive its client — otherwise a closed stdio pipe
+ * (e.g. an editor reload) would leak the loopback port and a token-gated viewer
+ * of the last diff. `exit` is injected for testability.
+ */
+export function makeShutdown(exit: (code: number) => void = process.exit): () => void {
+  let done = false;
+  return () => {
+    if (done) return;
+    done = true;
+    stopCurrentSession();
+    exit(0);
+  };
+}
+
 /** `value` must be an absolute path inside a git work tree; returns its repo root. */
 function requireRepo(value: string, label: string): string {
   if (!isAbsolute(value)) {
