@@ -44,7 +44,7 @@ Types are the docs. Symbols below are real exports of
 ## Chosen mechanism (preference #1 — native full-file)
 
 Fetch authoritative base+head bytes from `/api/file-content` → `parseDiffFromFile`
-→ `<FileDiff fileDiff={meta} options={{ …toDiffOptions, expandUnchanged: true }} disableWorkerPool />`.
+→ `<FileDiff fileDiff={meta} options={{ …toDiffOptions, expandUnchanged: true }} />`.
 Least code, lowest fidelity risk (the library owns the diff computation; we supply
 git's bytes). Lives in `src/ui/src/lib/expand.ts` (`requiredSides`, `canExpand`,
 `buildExpandedDiff`) + the Expand control in `FileDiffCard.tsx`.
