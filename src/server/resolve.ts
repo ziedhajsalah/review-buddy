@@ -119,7 +119,12 @@ export function resolveReview(
   });
 
   for (const ch of chaptersInOrder) {
-    const files: ResolvedFile[] = [];
+    // A path listed more than once in a chapter must yield ONE ResolvedFile with
+    // the UNION of claimed hunks — two entries with the same path become duplicate
+    // React keys in the viewer and corrupt per-card state. Key by the parsed file
+    // object (findFile can map two path spellings to the same file — those merge).
+    const claimedByFile = new Map<ParsedFile, Set<ParsedHunk>>();
+    const fileOrder: ParsedFile[] = [];
 
     for (const af of ch.files) {
       const parsed = findFile(af.path);
@@ -157,10 +162,18 @@ export function resolveReview(
       }
       referenced.add(parsed);
 
-      // Emit hunks in file order regardless of anchor order (O(H) via Set).
-      const claimedSet = new Set(claimed);
-      files.push(resolvedFileFrom(parsed, parsed.hunks.filter((h) => claimedSet.has(h))));
+      if (!claimedByFile.has(parsed)) {
+        claimedByFile.set(parsed, new Set());
+        fileOrder.push(parsed);
+      }
+      const set = claimedByFile.get(parsed)!;
+      for (const h of claimed) set.add(h);
     }
+
+    const files: ResolvedFile[] = fileOrder.map((parsed) => {
+      const claimedSet = claimedByFile.get(parsed)!;
+      return resolvedFileFrom(parsed, parsed.hunks.filter((h) => claimedSet.has(h)));
+    });
 
     chapters.push({
       index: ch.index,
