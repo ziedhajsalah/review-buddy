@@ -1,10 +1,10 @@
-import type { ReactNode } from "react";
-import { WorkerPoolContextProvider } from "@pierre/diffs/react";
 import type { WorkerInitializationRenderOptions, WorkerPoolOptions } from "@pierre/diffs/react";
+import { WorkerPoolContextProvider } from "@pierre/diffs/react";
 // Separate hashed asset (not ?worker&inline) so workers load from same-origin URLs
 // compatible with the viewer CSP (default-src 'self'; blob:/data: workers blocked).
 // @ts-expect-error Vite ?worker virtual module (no ambient types in this package)
 import DiffsWorker from "@pierre/diffs/worker/worker.js?worker";
+import type { ReactNode } from "react";
 
 const poolOptions: WorkerPoolOptions = {
   poolSize: Math.min(Math.max(1, (globalThis.navigator?.hardwareConcurrency ?? 2) - 1), 3),

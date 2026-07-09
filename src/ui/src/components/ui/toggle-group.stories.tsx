@@ -14,10 +14,16 @@ export const Single: Story = {
   args: { type: "single" },
   render: () => (
     <ToggleGroup type="single" defaultValue="unified" variant="outline" spacing={0}>
-      <ToggleGroupItem value="unified" className="data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
+      <ToggleGroupItem
+        value="unified"
+        className="data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
+      >
         Unified
       </ToggleGroupItem>
-      <ToggleGroupItem value="split" className="data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
+      <ToggleGroupItem
+        value="split"
+        className="data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
+      >
         Split
       </ToggleGroupItem>
     </ToggleGroup>

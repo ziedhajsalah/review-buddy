@@ -4,9 +4,9 @@
  * never stages, commits, or resets the user's working tree.
  */
 import { execFile, execFileSync } from "node:child_process";
-import { promisify } from "node:util";
 import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { join, sep } from "node:path";
+import { promisify } from "node:util";
 import type { PrMetadata } from "../types/review.ts";
 
 /** git's hash of the empty tree — used to diff a repo with no commits yet. */
@@ -15,12 +15,7 @@ export const EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
 const MAX_BUFFER = 1024 * 1024 * 128;
 const execFileAsync = promisify(execFile);
 
-function run(
-  cmd: string,
-  cwd: string,
-  args: string[],
-  allowFail = false,
-): string {
+function run(cmd: string, cwd: string, args: string[], allowFail = false): string {
   try {
     return execFileSync(cmd, args, { cwd, encoding: "utf8", maxBuffer: MAX_BUFFER });
   } catch (err) {
@@ -38,7 +33,11 @@ async function runAsync(
   allowFail = false,
 ): Promise<string> {
   try {
-    const { stdout } = await execFileAsync(cmd, args, { cwd, encoding: "utf8", maxBuffer: MAX_BUFFER });
+    const { stdout } = await execFileAsync(cmd, args, {
+      cwd,
+      encoding: "utf8",
+      maxBuffer: MAX_BUFFER,
+    });
     return stdout;
   } catch (err) {
     const stdout = (err as { stdout?: string }).stdout;
@@ -72,7 +71,9 @@ export function assertSafeRef(ref: string): void {
 
 export function assertPrRef(ref: string): void {
   if (!PR_REF_RE.test(ref)) {
-    throw new Error(`Refusing unsafe PR ref (want a number or github PR URL): ${JSON.stringify(ref)}`);
+    throw new Error(
+      `Refusing unsafe PR ref (want a number or github PR URL): ${JSON.stringify(ref)}`,
+    );
   }
 }
 
@@ -112,7 +113,11 @@ export async function captureDiff(cwd: string, base: string): Promise<string> {
     while (true) {
       const i = next++;
       if (i >= others.length) return;
-      parts[i] = await gitAsync(cwd, ["diff", "--no-color", "--no-index", "--", "/dev/null", others[i]!], true);
+      parts[i] = await gitAsync(
+        cwd,
+        ["diff", "--no-color", "--no-index", "--", "/dev/null", others[i]!],
+        true,
+      );
     }
   }
   await Promise.all(Array.from({ length: Math.min(LIMIT, others.length) }, worker));

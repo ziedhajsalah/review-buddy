@@ -16,11 +16,11 @@
  * No flag = off: the handler is the Phase-1 ack for the hook flow.
  */
 import { isAbsolute } from "node:path";
-import type { AgentReview } from "../types/review.ts";
-import type { RunningServer } from "../server/http.ts";
 import { repoToplevel } from "../server/git.ts";
+import type { RunningServer } from "../server/http.ts";
 import { openReviewSession, requestChangesMessage } from "../server/session.ts";
 import { validateAgentReview } from "../server/validate.ts";
+import type { AgentReview } from "../types/review.ts";
 import type { StandaloneMode } from "./mode.ts";
 
 export interface ToolResult {
@@ -139,7 +139,9 @@ export async function handleStandaloneSubmit(
   if (current === server) current = undefined;
   server.stop();
   if (result.superseded) {
-    return ok("This review was superseded by a newer submit_review call; no verdict was collected.");
+    return ok(
+      "This review was superseded by a newer submit_review call; no verdict was collected.",
+    );
   }
   if (result.verdict === "request_changes") {
     return ok(requestChangesMessage(result.summary));

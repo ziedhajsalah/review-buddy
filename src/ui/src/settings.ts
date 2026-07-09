@@ -2,8 +2,9 @@
  * Display settings — the reviewer's local view preferences (source D). Persisted
  * to a host-scoped cookie and mapped onto @pierre/diffs' FileDiffOptions.
  */
-import { useCallback } from "react";
+
 import type { FileDiffOptions } from "@pierre/diffs";
+import { useCallback } from "react";
 import type { DisplaySettings } from "../../types/review.ts";
 import { usePersistedState } from "./lib/usePersistedState.ts";
 

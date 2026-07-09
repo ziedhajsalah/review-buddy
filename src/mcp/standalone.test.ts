@@ -2,8 +2,8 @@ import { afterAll, afterEach, beforeAll, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { AgentReview } from "../types/review.ts";
 import { makeTempRepo, sampleReview, VIEWER_URL_RE } from "../test-helpers.ts";
+import type { AgentReview } from "../types/review.ts";
 import { standaloneMode } from "./mode.ts";
 import { handleStandaloneSubmit, makeShutdown, stopCurrentSession } from "./standalone.ts";
 
@@ -66,7 +66,9 @@ test("detached: serves the review, returns the URL immediately, keeps server ali
   // The viewer must still be live AFTER the tool call returned — that's the
   // whole point of detached mode (harness tool timeouts can't hold a review).
   const r = await fetch(`http://127.0.0.1:${m![1]}/api/review?token=${m![2]}`);
-  const body = (await r.json()) as { chapters: Array<{ files: Array<{ hunks: Array<{ lines: string[] }> }> }> };
+  const body = (await r.json()) as {
+    chapters: Array<{ files: Array<{ hunks: Array<{ lines: string[] }> }> }>;
+  };
   expect(body.chapters[0]!.files[0]!.hunks[0]!.lines).toContain("+let y = 20;");
 });
 
@@ -160,7 +162,9 @@ test("blocking: a newer submit supersedes the pending review and unblocks its aw
   expect(first.content[0]!.text).toContain("superseded");
 
   // ...its server is stopped, and the new viewer is the live one.
-  const oldDead = await fetch(`${old.origin}/api/review?token=${old.searchParams.get("token")}`).then(
+  const oldDead = await fetch(
+    `${old.origin}/api/review?token=${old.searchParams.get("token")}`,
+  ).then(
     () => false,
     () => true,
   );

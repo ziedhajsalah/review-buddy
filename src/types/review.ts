@@ -98,21 +98,21 @@ export interface AgentReview {
 
 export interface ReviewMeta {
   aiGenerated: boolean;
-  generatedBy: string;   // model id
-  generatedAt: string;   // ISO timestamp
+  generatedBy: string; // model id
+  generatedAt: string; // ISO timestamp
   promptVersion: string;
 }
 
 /** Source B — from git/gh, not the agent. */
 export interface PrMetadata {
   title: string;
-  description: string;   // author's original PR body (markdown)
+  description: string; // author's original PR body (markdown)
   author: string;
   createdAt: string;
   base: string;
   head: string;
-  url?: string;          // phase 2
-  ciStatus?: string;     // phase 2
+  url?: string; // phase 2
+  ciStatus?: string; // phase 2
   /** PR head commit SHA (PR mode only) — drives file-content expansion. */
   headRefOid?: string;
 }
@@ -123,7 +123,7 @@ export interface ResolvedHunk {
   old_lines: number;
   new_start: number;
   new_lines: number;
-  header: string;        // full @@ ... @@ line
+  header: string; // full @@ ... @@ line
   /** Real unified-diff lines (" ctx", "+add", "-del"). */
   lines: string[];
 }
@@ -131,9 +131,9 @@ export interface ResolvedHunk {
 export interface ResolvedFile {
   path: string;
   change_type: ChangeType;
-  additions: number;     // tool-computed
-  deletions: number;     // tool-computed
-  language: string;      // derived from extension
+  additions: number; // tool-computed
+  deletions: number; // tool-computed
+  language: string; // derived from extension
   hunks: ResolvedHunk[]; // resolved from B, scoped to this chapter
   /** True for binary files (no text hunks). From the real diff, not the agent. */
   binary?: boolean;
@@ -146,8 +146,8 @@ export interface ResolvedChapter {
   title: string;
   risk: Risk;
   risk_reason: string;
-  additions: number;     // tool-computed
-  deletions: number;     // tool-computed
+  additions: number; // tool-computed
+  deletions: number; // tool-computed
   fileCount: number;
   description: string;
   files: ResolvedFile[];

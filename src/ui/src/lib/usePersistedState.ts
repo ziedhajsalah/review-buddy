@@ -9,7 +9,12 @@ export function parseStored<T>(raw: string | null, initial: T): T {
     if (Array.isArray(initial)) {
       return (Array.isArray(parsed) ? parsed : initial) as T;
     }
-    if (typeof initial === "object" && initial !== null && typeof parsed === "object" && parsed !== null) {
+    if (
+      typeof initial === "object" &&
+      initial !== null &&
+      typeof parsed === "object" &&
+      parsed !== null
+    ) {
       return { ...initial, ...(parsed as Record<string, unknown>) } as T;
     }
     return parsed as T;
@@ -49,6 +54,7 @@ function readCookie<T>(key: string, initial: T): T {
 function writeCookie<T>(key: string, value: T): void {
   try {
     const encoded = encodeURIComponent(JSON.stringify(value));
+    // biome-ignore lint/suspicious/noDocumentCookie: viewer persists display preferences in a first-party cookie
     document.cookie = `${key}=${encoded}; path=/; max-age=31536000; SameSite=Lax`;
   } catch {
     /* non-fatal */
@@ -61,12 +67,15 @@ export function usePersistedState<T>(
   backend: StorageBackend,
 ): readonly [T, (updater: T | ((prev: T) => T)) => void] {
   const read = backend === "local" ? readLocal : readCookie;
-  const write = backend === "local" ? writeLocal : writeCookie;
 
   const [value, setValue] = useState<T>(() => read(key, initial));
 
   useEffect(() => {
-    write(key, value);
+    if (backend === "local") {
+      writeLocal(key, value);
+    } else {
+      writeCookie(key, value);
+    }
   }, [key, value, backend]);
 
   const update = useCallback((updater: T | ((prev: T) => T)) => {

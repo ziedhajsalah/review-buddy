@@ -5,8 +5,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AgentReview, PrMetadata, ReviewMeta } from "../types/review.ts";
 import { captureDiff, capturePr, resolveBase } from "./git.ts";
+import { type RunningServer, startServer } from "./http.ts";
 import { resolveReview } from "./resolve.ts";
-import { startServer, type RunningServer } from "./http.ts";
 
 let dir: string;
 let server: RunningServer;
@@ -159,10 +159,9 @@ describe("HTTP server", () => {
     const { review } = resolveReview(agent, await captureDiff(dir, base), META, pr);
     const s = startServer({ review, cwd: dir, baseRef: base, headRef: null });
     try {
-      const res = await fetch(
-        `http://127.0.0.1:${s.port}/api/file-content?path=app.ts&side=head`,
-        { headers: { "x-review-buddy-token": s.token } },
-      );
+      const res = await fetch(`http://127.0.0.1:${s.port}/api/file-content?path=app.ts&side=head`, {
+        headers: { "x-review-buddy-token": s.token },
+      });
       const body = await res.json();
       expect(body.content).toBe(""); // PR mode, unavailable — NOT the worktree "const b = 22;"
     } finally {
@@ -176,9 +175,7 @@ describe("HTTP server", () => {
     );
     expect(traversal.status).toBe(403); // not in the review's file allowlist
 
-    const absolute = await authed(
-      `api/file-content?path=${encodeURIComponent("/etc/passwd")}`,
-    );
+    const absolute = await authed(`api/file-content?path=${encodeURIComponent("/etc/passwd")}`);
     expect(absolute.status).toBe(403);
   });
 
@@ -192,9 +189,16 @@ describe("HTTP server", () => {
     // execFileSync would block the event loop the in-process server runs on,
     // deadlocking against its own request.
     const proc = Bun.spawn([
-      "curl", "-s", "-o", "/dev/null", "-w", "%{http_code}",
-      "-H", "Host: evil.com",
-      "-H", `x-review-buddy-token: ${server.token}`,
+      "curl",
+      "-s",
+      "-o",
+      "/dev/null",
+      "-w",
+      "%{http_code}",
+      "-H",
+      "Host: evil.com",
+      "-H",
+      `x-review-buddy-token: ${server.token}`,
       apiUrl("api/review"),
     ]);
     const code = (await new Response(proc.stdout).text()).trim();
@@ -252,13 +256,22 @@ describe("HTTP server", () => {
     try {
       // fetch overwrites Content-Length from the real body — curl can forge it.
       const proc = Bun.spawn([
-        "curl", "-s",
-        "-o", "/dev/null", "-w", "%{http_code}",
-        "-X", "POST",
-        "-H", "content-type: application/json",
-        "-H", `content-length: ${256 * 1024 + 1}`,
-        "-H", `x-review-buddy-token: ${s.token}`,
-        "-d", "{}",
+        "curl",
+        "-s",
+        "-o",
+        "/dev/null",
+        "-w",
+        "%{http_code}",
+        "-X",
+        "POST",
+        "-H",
+        "content-type: application/json",
+        "-H",
+        `content-length: ${256 * 1024 + 1}`,
+        "-H",
+        `x-review-buddy-token: ${s.token}`,
+        "-d",
+        "{}",
         `http://127.0.0.1:${s.port}/api/done`,
       ]);
       const code = (await new Response(proc.stdout).text()).trim();
@@ -346,10 +359,7 @@ describe("HTTP server", () => {
     const s = await startUiServer(uiDir);
     try {
       const curlBody = async (path: string) => {
-        const proc = Bun.spawn([
-          "curl", "-s", "--path-as-is",
-          `http://127.0.0.1:${s.port}${path}`,
-        ]);
+        const proc = Bun.spawn(["curl", "-s", "--path-as-is", `http://127.0.0.1:${s.port}${path}`]);
         const body = await new Response(proc.stdout).text();
         await proc.exited;
         return body;
@@ -405,8 +415,14 @@ describe("HTTP server", () => {
     const s = startServer({ review, cwd: dir, baseRef: base, uiDir });
     try {
       const proc = Bun.spawn([
-        "curl", "-s", "-o", "/dev/null", "-w", "%{http_code}",
-        "-H", `x-review-buddy-token: ${s.token}`,
+        "curl",
+        "-s",
+        "-o",
+        "/dev/null",
+        "-w",
+        "%{http_code}",
+        "-H",
+        `x-review-buddy-token: ${s.token}`,
         `http://127.0.0.1:${s.port}/%`,
       ]);
       const code = (await new Response(proc.stdout).text()).trim();

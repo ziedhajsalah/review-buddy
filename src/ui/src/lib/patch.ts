@@ -11,12 +11,9 @@ export function fileToPatch(f: ResolvedFile): string {
   const oldName = f.change_type === "added" ? "/dev/null" : `a/${oldPath}`;
   const newName = f.change_type === "deleted" ? "/dev/null" : `b/${f.path}`;
 
-  const header =
-    `diff --git a/${oldPath} b/${f.path}\n` + `--- ${oldName}\n` + `+++ ${newName}\n`;
+  const header = `diff --git a/${oldPath} b/${f.path}\n` + `--- ${oldName}\n` + `+++ ${newName}\n`;
 
-  const body = f.hunks
-    .map((h) => `${h.header}\n${h.lines.join("\n")}`)
-    .join("\n");
+  const body = f.hunks.map((h) => `${h.header}\n${h.lines.join("\n")}`).join("\n");
 
   // Trailing newline keeps the last hunk line well-formed for the parser.
   return body ? `${header}${body}\n` : header;

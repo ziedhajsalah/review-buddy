@@ -21,7 +21,7 @@ import type {
   ReviewMeta,
   ReviewStats,
 } from "../types/review.ts";
-import { languageOf, parseDiff, type ParsedFile, type ParsedHunk } from "./diff.ts";
+import { languageOf, type ParsedFile, type ParsedHunk, parseDiff } from "./diff.ts";
 
 export interface ResolveResult {
   review: ResolvedReview;
@@ -172,7 +172,10 @@ export function resolveReview(
 
     const files: ResolvedFile[] = fileOrder.map((parsed) => {
       const claimedSet = claimedByFile.get(parsed)!;
-      return resolvedFileFrom(parsed, parsed.hunks.filter((h) => claimedSet.has(h)));
+      return resolvedFileFrom(
+        parsed,
+        parsed.hunks.filter((h) => claimedSet.has(h)),
+      );
     });
 
     chapters.push({

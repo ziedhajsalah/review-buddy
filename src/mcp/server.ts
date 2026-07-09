@@ -23,10 +23,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import {
-  CallToolRequestSchema,
-  ListToolsRequestSchema,
-} from "@modelcontextprotocol/sdk/types.js";
+import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 // Only the flag parser is imported eagerly — the standalone handler (and the
 // whole review-session stack behind it) loads lazily, so the default Claude
 // Code mode pays nothing for machinery only other harnesses use.
@@ -35,9 +32,7 @@ import { standaloneMode } from "./mode.ts";
 // Load the JSON Schema as the single source of truth; strip JSON-Schema meta
 // keywords MCP inputSchema doesn't need.
 const schemaPath = join(import.meta.dir, "..", "..", "schemas", "review.schema.json");
-const { $schema, $id, title, ...inputSchema } = JSON.parse(
-  readFileSync(schemaPath, "utf8"),
-);
+const { $schema, $id, title, ...inputSchema } = JSON.parse(readFileSync(schemaPath, "utf8"));
 void $schema;
 void $id;
 void title;

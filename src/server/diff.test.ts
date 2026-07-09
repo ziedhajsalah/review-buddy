@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync, unlinkSync } from "node:fs";
+import { mkdtempSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { languageOf, parseDiff } from "./diff.ts";
@@ -161,8 +161,7 @@ describe("languageOf", () => {
 describe("round-trip fidelity against real git diff", () => {
   test("resolved hunk bodies appear verbatim in `git diff` output", () => {
     const dir = mkdtempSync(join(tmpdir(), "rb-difftest-"));
-    const git = (...args: string[]) =>
-      execFileSync("git", args, { cwd: dir, encoding: "utf8" });
+    const git = (...args: string[]) => execFileSync("git", args, { cwd: dir, encoding: "utf8" });
     try {
       git("init", "-q");
       git("config", "user.email", "t@t.t");
@@ -207,9 +206,7 @@ describe("round-trip fidelity against real git diff", () => {
         expect(f.additions).toBe(expected!.add);
         expect(f.deletions).toBe(expected!.del);
       }
-      expect(files.map((f) => f.path).sort()).toEqual(
-        ["added.ts", "drop.ts", "keep.ts"].sort(),
-      );
+      expect(files.map((f) => f.path).sort()).toEqual(["added.ts", "drop.ts", "keep.ts"].sort());
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

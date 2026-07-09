@@ -1,7 +1,11 @@
 import { Component, type ReactNode } from "react";
 
-interface Props { children: ReactNode }
-interface State { error: Error | null }
+interface Props {
+  children: ReactNode;
+}
+interface State {
+  error: Error | null;
+}
 
 /** Last-resort guard: render errors show a readable panel, not a white page. */
 export class ErrorBoundary extends Component<Props, State> {
@@ -16,9 +20,7 @@ export class ErrorBoundary extends Component<Props, State> {
       return (
         <div className="mx-auto max-w-xl p-10 text-center">
           <h1 className="mb-2 text-lg font-semibold">Something went wrong rendering the review</h1>
-          <p className="font-mono text-sm text-muted-foreground">
-            {String(this.state.error)}
-          </p>
+          <p className="font-mono text-sm text-muted-foreground">{String(this.state.error)}</p>
         </div>
       );
     }

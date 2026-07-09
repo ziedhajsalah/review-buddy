@@ -1,18 +1,18 @@
-import { memo, useId, useMemo, useState } from "react";
-import { PatchDiff, FileDiff } from "@pierre/diffs/react";
 import type { FileDiffMetadata } from "@pierre/diffs";
-import type { ResolvedFile, DisplaySettings } from "../../../types/review.ts";
+import { FileDiff, PatchDiff } from "@pierre/diffs/react";
+import { memo, useId, useMemo, useState } from "react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { cn } from "@/lib/utils";
+import type { DisplaySettings, ResolvedFile } from "../../../types/review.ts";
 import { fetchFileContent } from "../api.ts";
-import { DiffStat } from "./DiffStat.tsx";
-import { requiredSides, canExpand, buildExpandedDiff } from "../lib/expand.ts";
+import { buildExpandedDiff, canExpand, requiredSides } from "../lib/expand.ts";
 import { fileToPatch } from "../lib/patch.ts";
 import { toDiffOptions } from "../settings.ts";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
-import { cn } from "@/lib/utils";
+import { DiffStat } from "./DiffStat.tsx";
 
 const CHANGE_LABEL: Record<ResolvedFile["change_type"], string> = {
   added: "added",
@@ -79,7 +79,9 @@ export const FileDiffCard = memo(function FileDiffCard({
       // allowlisted) propagates to the catch and surfaces the error string,
       // per plan 015 Step 3. Either way we never render an empty file as content.
       const [base, head] = await Promise.all([
-        req.base ? fetchFileContent(file.old_path ?? file.path, "base").then((r) => r.content) : Promise.resolve(""),
+        req.base
+          ? fetchFileContent(file.old_path ?? file.path, "base").then((r) => r.content)
+          : Promise.resolve(""),
         req.head ? fetchFileContent(file.path, "head").then((r) => r.content) : Promise.resolve(""),
       ]);
       if (!canExpand(file, base, head)) {
@@ -113,7 +115,10 @@ export const FileDiffCard = memo(function FileDiffCard({
           <span className="truncate font-mono text-sm" title={file.path}>
             {file.old_path ? `${file.old_path} → ${file.path}` : file.path}
           </span>
-          <Badge variant="outline" className="shrink-0 rounded px-1.5 py-0.5 text-[0.62rem] uppercase">
+          <Badge
+            variant="outline"
+            className="shrink-0 rounded px-1.5 py-0.5 text-[0.62rem] uppercase"
+          >
             {CHANGE_LABEL[file.change_type]}
           </Badge>
         </div>
@@ -140,7 +145,10 @@ export const FileDiffCard = memo(function FileDiffCard({
               checked={viewed}
               onCheckedChange={() => onToggleViewed(file.path)}
             />
-            <Label htmlFor={viewedId} className="cursor-pointer text-xs font-normal text-muted-foreground">
+            <Label
+              htmlFor={viewedId}
+              className="cursor-pointer text-xs font-normal text-muted-foreground"
+            >
               viewed
             </Label>
           </div>

@@ -15,6 +15,7 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import type { AgentReview, ReviewMeta } from "../types/review.ts";
+import { openBrowser } from "./browser.ts";
 import {
   assertSafeRef,
   captureDiff,
@@ -24,9 +25,8 @@ import {
   prBaseRef,
   resolveBase,
 } from "./git.ts";
+import { type RunningServer, startServer } from "./http.ts";
 import { resolveReview } from "./resolve.ts";
-import { startServer, type RunningServer } from "./http.ts";
-import { openBrowser } from "./browser.ts";
 
 const repoRoot = join(import.meta.dir, "..", "..");
 
@@ -54,7 +54,12 @@ function buildMeta(): ReviewMeta {
 export async function captureForSource(
   agent: AgentReview,
   cwd: string,
-): Promise<{ diff: string; pr: ReturnType<typeof capturePr>; base: string; headRef?: string | null }> {
+): Promise<{
+  diff: string;
+  pr: ReturnType<typeof capturePr>;
+  base: string;
+  headRef?: string | null;
+}> {
   const source = agent.source ?? { type: "worktree" };
 
   if (source.type === "pr" && source.ref) {

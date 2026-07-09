@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { FileDiffCard } from "./FileDiffCard.tsx";
 import { DEFAULT_SETTINGS, fakeResolvedFile } from "../stories/fixtures.ts";
+import { FileDiffCard } from "./FileDiffCard.tsx";
 
 const meta = {
   title: "Components/FileDiffCard",

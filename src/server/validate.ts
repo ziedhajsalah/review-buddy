@@ -54,7 +54,5 @@ export const AgentReviewSchema = z.object({
 export function validateAgentReview(agent: unknown): string | null {
   const parsed = AgentReviewSchema.safeParse(agent);
   if (parsed.success) return null;
-  return parsed.error.issues
-    .map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`)
-    .join("; ");
+  return parsed.error.issues.map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`).join("; ");
 }

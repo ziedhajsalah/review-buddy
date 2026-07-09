@@ -1,12 +1,21 @@
 import { expect, spyOn, test } from "bun:test";
-import { execFileSync } from "node:child_process";
 import * as childProcess from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { parseDiff } from "./diff.ts";
-import { assertPrRef, assertSafeRef, captureDiff, capturePr, capturePrDiff, ensureCommit, fileContent, resolveBase } from "./git.ts";
 import { makeTempRepo } from "../test-helpers.ts";
+import { parseDiff } from "./diff.ts";
+import {
+  assertPrRef,
+  assertSafeRef,
+  captureDiff,
+  capturePr,
+  capturePrDiff,
+  ensureCommit,
+  fileContent,
+  resolveBase,
+} from "./git.ts";
 
 test("assertSafeRef rejects flag-smuggling refs, accepts real refs", () => {
   expect(() => assertSafeRef("-O/tmp/x")).toThrow();
@@ -61,7 +70,9 @@ test("captureDiff includes untracked files with special-character names", async 
     writeFileSync(join(dir, "plain.ts"), "plain\n");
 
     const diff = await captureDiff(dir, "HEAD");
-    const files = parseDiff(diff).map((f) => f.path).sort();
+    const files = parseDiff(diff)
+      .map((f) => f.path)
+      .sort();
     expect(files).toEqual(["café.ts", "plain.ts", "with space.ts"]);
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -162,14 +173,16 @@ test.serial("capturePr parses gh pr view JSON when available", () => {
     // Bun's execFileSync ignores runtime PATH mutations (oven-sh/bun#29237), so a
     // fake `gh` on PATH is not picked up. Intercept the gh call instead.
     const origExec = childProcess.execFileSync;
-    const ghSpy = spyOn(childProcess, "execFileSync").mockImplementation(
-      ((cmd: string, args?: readonly string[], opts?: Parameters<typeof origExec>[2]) => {
-        if (cmd === "gh") {
-          return '{"title":"T","body":"B","author":{"login":"alice"},"baseRefName":"main","headRefName":"feat"}\n';
-        }
-        return origExec(cmd, args ?? [], opts);
-      }) as typeof origExec,
-    );
+    const ghSpy = spyOn(childProcess, "execFileSync").mockImplementation(((
+      cmd: string,
+      args?: readonly string[],
+      opts?: Parameters<typeof origExec>[2],
+    ) => {
+      if (cmd === "gh") {
+        return '{"title":"T","body":"B","author":{"login":"alice"},"baseRefName":"main","headRefName":"feat"}\n';
+      }
+      return origExec(cmd, args ?? [], opts);
+    }) as typeof origExec);
 
     const pr = capturePr(dir, "fallback-base");
     expect(pr.title).toBe("T");
@@ -201,12 +214,14 @@ test.serial("capturePr falls back to local git when gh yields no JSON", () => {
     // subject as title, `git config user.name` as author). Intercept gh the same
     // way as the happy path; delegate real git calls.
     const origExec = childProcess.execFileSync;
-    const ghSpy = spyOn(childProcess, "execFileSync").mockImplementation(
-      ((cmd: string, args?: readonly string[], opts?: Parameters<typeof origExec>[2]) => {
-        if (cmd === "gh") return ""; // no JSON → fallback
-        return origExec(cmd, args ?? [], opts);
-      }) as typeof origExec,
-    );
+    const ghSpy = spyOn(childProcess, "execFileSync").mockImplementation(((
+      cmd: string,
+      args?: readonly string[],
+      opts?: Parameters<typeof origExec>[2],
+    ) => {
+      if (cmd === "gh") return ""; // no JSON → fallback
+      return origExec(cmd, args ?? [], opts);
+    }) as typeof origExec);
 
     const pr = capturePr(dir, "fallback-base");
     expect(pr.title).toBe("my subject");

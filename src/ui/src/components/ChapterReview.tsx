@@ -1,15 +1,15 @@
 import { useEffect, useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import type { ResolvedReview } from "../../../types/review.ts";
-import { RiskBadge } from "./RiskBadge.tsx";
+import { fetchConfig, postDone } from "../api.ts";
+import { clearViewedFiles, useViewedFiles } from "../lib/viewed.ts";
+import { useDisplaySettings } from "../settings.ts";
 import { DiffStat } from "./DiffStat.tsx";
 import { DisplaySettingsBar } from "./DisplaySettingsBar.tsx";
 import { FileDiffCard } from "./FileDiffCard.tsx";
 import { Markdown } from "./Markdown.tsx";
-import { useDisplaySettings } from "../settings.ts";
-import { useViewedFiles, clearViewedFiles } from "../lib/viewed.ts";
-import { postDone, fetchConfig } from "../api.ts";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { RiskBadge } from "./RiskBadge.tsx";
 
 export function ChapterReview({
   review,
@@ -43,14 +43,16 @@ export function ChapterReview({
 
   // Verdict UI is gated by REVIEW_BUDDY_ROUNDTRIP; the server exposes it via /api/config.
   useEffect(() => {
-    fetchConfig().then((c) => setRoundtrip(c.roundtrip)).catch(() => {});
+    fetchConfig()
+      .then((c) => setRoundtrip(c.roundtrip))
+      .catch(() => {});
   }, []);
 
-  // Scroll the diff pane to top and reset file filter whenever the chapter changes.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reset scroll/filter when navigating chapters
   useEffect(() => {
     diffScrollRef.current?.scrollTo({ top: 0 });
     setFilter("");
-  }, [position]);
+  }, [chapterIndex]);
 
   if (!chapter) {
     return <div className="p-10">No chapters to review.</div>;
@@ -159,9 +161,7 @@ export function ChapterReview({
               </Button>
             </div>
           )}
-          {submitError && (
-            <p className="text-xs text-[var(--color-risk-high)]">{submitError}</p>
-          )}
+          {submitError && <p className="text-xs text-[var(--color-risk-high)]">{submitError}</p>}
         </div>
       </header>
 
@@ -195,6 +195,7 @@ export function ChapterReview({
             {files.map((f) => (
               <li key={f.path}>
                 <button
+                  type="button"
                   onClick={() => scrollToFile(f.path)}
                   className="flex w-full items-center justify-between gap-2 rounded px-2 py-1 text-left text-xs hover:bg-background"
                 >

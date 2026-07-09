@@ -3,14 +3,21 @@ import { validateAgentReview } from "./validate.ts";
 
 const good = {
   prologue: {
-    why: "w", what: "x",
+    why: "w",
+    what: "x",
     key_changes: [{ headline: "h", detail: "d" }],
     review_focus: { summary: "s", file: "app.ts" },
   },
-  chapters: [{
-    index: 1, title: "t", risk: "Low", risk_reason: "r",
-    description: "d", files: [{ path: "app.ts", change_type: "modified" }],
-  }],
+  chapters: [
+    {
+      index: 1,
+      title: "t",
+      risk: "Low",
+      risk_reason: "r",
+      description: "d",
+      files: [{ path: "app.ts", change_type: "modified" }],
+    },
+  ],
 };
 
 test("accepts a well-formed agent review", () => {

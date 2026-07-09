@@ -40,7 +40,12 @@ test("expand surfaces an error notice when file-content fetch rejects", async ()
     throw new Error("boom");
   };
   render(
-    <FileDiffCard file={modified} settings={DEFAULT_SETTINGS} viewed={false} onToggleViewed={() => {}} />,
+    <FileDiffCard
+      file={modified}
+      settings={DEFAULT_SETTINGS}
+      viewed={false}
+      onToggleViewed={() => {}}
+    />,
   );
   fireEvent.click(screen.getByText("expand"));
   await waitFor(() => expect(screen.getByText(/Full file unavailable/)).toBeDefined());
@@ -49,7 +54,12 @@ test("expand surfaces an error notice when file-content fetch rejects", async ()
 test("expand shows the unavailable notice when required content is empty", async () => {
   fetchImpl = async () => ({ content: "" });
   render(
-    <FileDiffCard file={modified} settings={DEFAULT_SETTINGS} viewed={false} onToggleViewed={() => {}} />,
+    <FileDiffCard
+      file={modified}
+      settings={DEFAULT_SETTINGS}
+      viewed={false}
+      onToggleViewed={() => {}}
+    />,
   );
   fireEvent.click(screen.getByText("expand"));
   await waitFor(() => expect(screen.getByText(/Full file unavailable/)).toBeDefined());

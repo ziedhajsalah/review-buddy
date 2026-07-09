@@ -14,8 +14,8 @@ import { createHash, timingSafeEqual } from "node:crypto";
 import { existsSync } from "node:fs";
 import { join, resolve, sep } from "node:path";
 import type { ResolvedReview } from "../types/review.ts";
-import { fileContent } from "./git.ts";
 import { languageOf } from "./diff.ts";
+import { fileContent } from "./git.ts";
 
 /** True iff `rel` resolves lexically inside `root` (blocks `..` only; does not dereference symlinks — link escape is guarded at read time in fileContent). */
 function isInside(root: string, rel: string): boolean {
@@ -138,8 +138,7 @@ export function startServer(ctx: ServerContext): RunningServer {
       // per-server token. Blocks a malicious local page that scans the port
       // but can't know the token, and CSRF on /api/done.
       if (pathname.startsWith("/api/")) {
-        const supplied =
-          req.headers.get("x-review-buddy-token") ?? url.searchParams.get("token");
+        const supplied = req.headers.get("x-review-buddy-token") ?? url.searchParams.get("token");
         if (!supplied || !safeEqual(supplied, token)) return json({ error: "unauthorized" }, 401);
       }
 
