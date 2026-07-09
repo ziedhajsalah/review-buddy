@@ -19,7 +19,7 @@ const META: ReviewMeta = {
   promptVersion: "1",
 };
 
-beforeAll(() => {
+beforeAll(async () => {
   dir = mkdtempSync(join(tmpdir(), "rb-http-"));
   const git = (...args: string[]) => execFileSync("git", args, { cwd: dir, encoding: "utf8" });
   git("init", "-q");
@@ -55,7 +55,7 @@ beforeAll(() => {
     ],
   };
   const pr: PrMetadata = capturePr(dir, base);
-  const { review } = resolveReview(agent, captureDiff(dir, base), META, pr);
+  const { review } = resolveReview(agent, await captureDiff(dir, base), META, pr);
   server = startServer({ review, cwd: dir, baseRef: base });
 });
 
@@ -101,7 +101,7 @@ describe("HTTP server", () => {
       ],
     };
     const pr = capturePr(dir, base);
-    const { review } = resolveReview(agent, captureDiff(dir, base), META, pr);
+    const { review } = resolveReview(agent, await captureDiff(dir, base), META, pr);
     const s = startServer({ review, cwd: dir, baseRef: base, roundtrip: true });
     try {
       const res = await fetch(`http://127.0.0.1:${s.port}/api/config`, {
@@ -156,7 +156,7 @@ describe("HTTP server", () => {
       ],
     };
     const pr: PrMetadata = capturePr(dir, base);
-    const { review } = resolveReview(agent, captureDiff(dir, base), META, pr);
+    const { review } = resolveReview(agent, await captureDiff(dir, base), META, pr);
     const s = startServer({ review, cwd: dir, baseRef: base, headRef: null });
     try {
       const res = await fetch(
@@ -247,7 +247,7 @@ describe("HTTP server", () => {
       ],
     };
     const pr: PrMetadata = capturePr(dir, base);
-    const { review } = resolveReview(agent, captureDiff(dir, base), META, pr);
+    const { review } = resolveReview(agent, await captureDiff(dir, base), META, pr);
     const s = startServer({ review, cwd: dir, baseRef: base });
     try {
       // fetch overwrites Content-Length from the real body — curl can forge it.
@@ -269,7 +269,7 @@ describe("HTTP server", () => {
     }
   });
 
-  function startUiServer(uiDir: string): RunningServer {
+  async function startUiServer(uiDir: string): Promise<RunningServer> {
     const agent: AgentReview = {
       prologue: {
         why: "w",
@@ -292,7 +292,7 @@ describe("HTTP server", () => {
       ],
     };
     const pr: PrMetadata = capturePr(dir, base);
-    const { review } = resolveReview(agent, captureDiff(dir, base), META, pr);
+    const { review } = resolveReview(agent, await captureDiff(dir, base), META, pr);
     return startServer({ review, cwd: dir, baseRef: base, uiDir });
   }
 
@@ -302,7 +302,7 @@ describe("HTTP server", () => {
     mkdirSync(join(uiDir, "assets"), { recursive: true });
     writeFileSync(join(uiDir, "index.html"), "<html>UI</html>");
     writeFileSync(join(uiDir, "assets", "app.js"), "console.log('app')");
-    const s = startUiServer(uiDir);
+    const s = await startUiServer(uiDir);
     try {
       const indexRes = await fetch(`http://127.0.0.1:${s.port}/`);
       const index = await indexRes.text();
@@ -326,7 +326,7 @@ describe("HTTP server", () => {
     const uiDir = join(parent, "ui");
     mkdirSync(uiDir, { recursive: true });
     writeFileSync(join(uiDir, "index.html"), "<html>UI</html>");
-    const s = startUiServer(uiDir);
+    const s = await startUiServer(uiDir);
     try {
       const res = await fetch(`http://127.0.0.1:${s.port}/nonexistent`);
       expect(res.status).toBe(200);
@@ -343,7 +343,7 @@ describe("HTTP server", () => {
     mkdirSync(uiDir, { recursive: true });
     writeFileSync(join(uiDir, "index.html"), "<html>UI</html>");
     writeFileSync(join(parent, "secret.txt"), "TOPSECRET");
-    const s = startUiServer(uiDir);
+    const s = await startUiServer(uiDir);
     try {
       const curlBody = async (path: string) => {
         const proc = Bun.spawn([
@@ -401,7 +401,7 @@ describe("HTTP server", () => {
       ],
     };
     const pr: PrMetadata = capturePr(dir, base);
-    const { review } = resolveReview(agent, captureDiff(dir, base), META, pr);
+    const { review } = resolveReview(agent, await captureDiff(dir, base), META, pr);
     const s = startServer({ review, cwd: dir, baseRef: base, uiDir });
     try {
       const proc = Bun.spawn([

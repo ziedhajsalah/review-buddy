@@ -50,7 +50,7 @@ function deny(reason: string): never {
 
 /** Open a session (capture/resolve/serve/browser) and block until Done. */
 async function serveAndBlock(agent: AgentReview, cwd: string): Promise<DoneResult> {
-  const server = openReviewSession(agent, cwd);
+  const server = await openReviewSession(agent, cwd);
   const result = await server.done;
   server.stop();
   return result;

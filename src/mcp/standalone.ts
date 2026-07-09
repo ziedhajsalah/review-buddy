@@ -118,7 +118,7 @@ export async function handleStandaloneSubmit(
   let server: RunningServer;
   try {
     // Blocking exists to return the verdict, so the verdict UI is forced on.
-    server = openReviewSession(agent, cwd, mode === "blocking" ? { roundtrip: true } : {});
+    server = await openReviewSession(agent, cwd, mode === "blocking" ? { roundtrip: true } : {});
   } catch (e) {
     return err(`Review Buddy could not open the review: ${errMsg(e)}`);
   }

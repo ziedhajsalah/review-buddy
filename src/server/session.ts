@@ -51,10 +51,10 @@ function buildMeta(): ReviewMeta {
  * tree (empty) and render no hunks. `base` is the ref used for full-file
  * expansion (source C).
  */
-export function captureForSource(
+export async function captureForSource(
   agent: AgentReview,
   cwd: string,
-): { diff: string; pr: ReturnType<typeof capturePr>; base: string; headRef?: string | null } {
+): Promise<{ diff: string; pr: ReturnType<typeof capturePr>; base: string; headRef?: string | null }> {
   const source = agent.source ?? { type: "worktree" };
 
   if (source.type === "pr" && source.ref) {
@@ -77,7 +77,7 @@ export function captureForSource(
   } else {
     base = resolveBase(cwd, process.env.REVIEW_BUDDY_BASE);
   }
-  return { diff: captureDiff(cwd, base), pr: capturePr(cwd, base), base };
+  return { diff: await captureDiff(cwd, base), pr: capturePr(cwd, base), base };
 }
 
 export interface SessionOptions {
@@ -94,12 +94,12 @@ export interface SessionOptions {
  * the caller decides whether to await `server.done` (blocking flows) or return
  * immediately (standalone detached mode). Throws on capture/resolve errors.
  */
-export function openReviewSession(
+export async function openReviewSession(
   agent: AgentReview,
   cwd: string,
   opts: SessionOptions = {},
-): RunningServer {
-  const { diff, pr, base, headRef } = captureForSource(agent, cwd);
+): Promise<RunningServer> {
+  const { diff, pr, base, headRef } = await captureForSource(agent, cwd);
   const { review, warnings } = resolveReview(agent, diff, buildMeta(), pr);
   for (const w of warnings) console.error(`[review-buddy] ${w}`);
   if (headRef === null) {

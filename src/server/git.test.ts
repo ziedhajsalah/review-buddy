@@ -44,7 +44,7 @@ test("capturePrDiff refuses an unsafe ref before shelling out to gh", () => {
   expect(() => capturePrDiff(process.cwd(), "--upload-pack=x")).toThrow();
 });
 
-test("captureDiff includes untracked files with special-character names", () => {
+test("captureDiff includes untracked files with special-character names", async () => {
   const dir = mkdtempSync(join(tmpdir(), "rb-git-"));
   try {
     const git = (...args: string[]) => execFileSync("git", args, { cwd: dir, encoding: "utf8" });
@@ -60,12 +60,24 @@ test("captureDiff includes untracked files with special-character names", () => 
     writeFileSync(join(dir, "with space.ts"), "space\n");
     writeFileSync(join(dir, "plain.ts"), "plain\n");
 
-    const diff = captureDiff(dir, "HEAD");
+    const diff = await captureDiff(dir, "HEAD");
     const files = parseDiff(diff).map((f) => f.path).sort();
     expect(files).toEqual(["café.ts", "plain.ts", "with space.ts"]);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test("captureDiff folds in multiple untracked files (concurrent, none dropped)", async () => {
+  const repo = makeTempRepo("rb-untracked-");
+  writeFileSync(join(repo, "u1.txt"), "one\n");
+  writeFileSync(join(repo, "u2.txt"), "two\n");
+  const diff = await captureDiff(repo, "HEAD");
+  expect(diff).toContain("+++ b/u1.txt");
+  expect(diff).toContain("+++ b/u2.txt");
+  expect(diff).toContain("+one");
+  expect(diff).toContain("+two");
+  rmSync(repo, { recursive: true, force: true });
 });
 
 test("fileContent (worktree head) refuses a symlink escaping the repo", () => {

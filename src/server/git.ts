@@ -3,7 +3,8 @@
  * contents — all read from the local repo in the hook's cwd. Non-mutating:
  * never stages, commits, or resets the user's working tree.
  */
-import { execFileSync } from "node:child_process";
+import { execFile, execFileSync } from "node:child_process";
+import { promisify } from "node:util";
 import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { join, sep } from "node:path";
 import type { PrMetadata } from "../types/review.ts";
@@ -12,6 +13,7 @@ import type { PrMetadata } from "../types/review.ts";
 export const EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
 
 const MAX_BUFFER = 1024 * 1024 * 128;
+const execFileAsync = promisify(execFile);
 
 function run(
   cmd: string,
@@ -29,11 +31,29 @@ function run(
   }
 }
 
+async function runAsync(
+  cmd: string,
+  cwd: string,
+  args: string[],
+  allowFail = false,
+): Promise<string> {
+  try {
+    const { stdout } = await execFileAsync(cmd, args, { cwd, encoding: "utf8", maxBuffer: MAX_BUFFER });
+    return stdout;
+  } catch (err) {
+    const stdout = (err as { stdout?: string }).stdout;
+    if (allowFail) return typeof stdout === "string" ? stdout : "";
+    throw err;
+  }
+}
+
 // core.quotePath=false is global on purpose: every path this module reads from
 // git (diff, ls-files, show, log) must arrive as raw UTF-8, never C-quoted, so
 // special-character filenames survive capture. Do not narrow it to one call.
 const git = (cwd: string, args: string[], allowFail = false) =>
   run("git", cwd, ["--no-pager", "-c", "core.quotePath=false", ...args], allowFail);
+const gitAsync = (cwd: string, args: string[], allowFail = false) =>
+  runAsync("git", cwd, ["--no-pager", "-c", "core.quotePath=false", ...args], allowFail);
 
 /**
  * Guard against argv flag smuggling: `ref` originates in the agent's JSON (and,
@@ -72,20 +92,32 @@ export function resolveBase(cwd: string, override?: string): string {
  * Untracked, non-ignored files are folded in via `git diff --no-index` so they
  * appear as new-file diffs without touching the index.
  */
-export function captureDiff(cwd: string, base: string): string {
-  const tracked = git(cwd, ["diff", "--no-color", base]);
+export async function captureDiff(cwd: string, base: string): Promise<string> {
+  const tracked = await gitAsync(cwd, ["diff", "--no-color", base]);
 
   // -z = NUL-terminated raw paths: no C-quoting of special characters, so the
   // exact on-disk name reaches `git diff --no-index` below.
-  const others = git(cwd, ["ls-files", "-z", "--others", "--exclude-standard"])
+  const others = (await gitAsync(cwd, ["ls-files", "-z", "--others", "--exclude-standard"]))
     .split("\0")
     .filter(Boolean);
 
-  let untracked = "";
-  for (const f of others) {
-    untracked += git(cwd, ["diff", "--no-color", "--no-index", "--", "/dev/null", f], true);
+  // Fold untracked files via `git diff --no-index` — one spawn per file (the
+  // command takes exactly two paths, so it can't be batched). Run them
+  // concurrently (bounded) so an atypical repo with many untracked non-ignored
+  // files doesn't stall the blocking hook. Order preserved for a stable diff.
+  const LIMIT = 16;
+  const parts: string[] = new Array(others.length);
+  let next = 0;
+  async function worker() {
+    while (true) {
+      const i = next++;
+      if (i >= others.length) return;
+      parts[i] = await gitAsync(cwd, ["diff", "--no-color", "--no-index", "--", "/dev/null", others[i]!], true);
+    }
   }
+  await Promise.all(Array.from({ length: Math.min(LIMIT, others.length) }, worker));
 
+  const untracked = parts.join("");
   if (!untracked) return tracked;
   const sep = tracked && !tracked.endsWith("\n") ? "\n" : "";
   return tracked + sep + untracked;
