@@ -29,6 +29,7 @@ export function DisplaySettingsBar({
         options={[
           ["line", "Line"],
           ["word", "Word"],
+          ["char", "Char"],
         ]}
         onChange={(v) => update({ granularity: v })}
       />

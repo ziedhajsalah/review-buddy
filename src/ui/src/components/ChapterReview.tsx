@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { ResolvedReview } from "../../../types/review.ts";
 import { fetchConfig, postDone } from "../api.ts";
-import { clearViewedFiles, useViewedFiles } from "../lib/viewed.ts";
+import { clearReviewFileState, useCollapsedFiles, useViewedFiles } from "../lib/chapterFileSet.ts";
 import { useDisplaySettings } from "../settings.ts";
 import { DiffStat } from "./DiffStat.tsx";
 import { DisplaySettingsBar } from "./DisplaySettingsBar.tsx";
@@ -29,7 +29,17 @@ export function ChapterReview({
   // exists solely to keep useViewedFiles unconditional (a hook can't run after
   // that guard).
   const chapterIndex = chapters[position]?.index ?? -1;
-  const [viewed, toggleViewed] = useViewedFiles(chapterIndex);
+  const [viewed, setViewed] = useViewedFiles(chapterIndex);
+  const [collapsed, setCollapsed] = useCollapsedFiles(chapterIndex);
+  // Product rule: marking a file viewed collapses it (and unmarking expands it) —
+  // kept here, not in the card, so the card stays pure presentation.
+  const handleViewedChange = useCallback(
+    (path: string, checked: boolean) => {
+      setViewed(path, checked);
+      setCollapsed(path, checked);
+    },
+    [setViewed, setCollapsed],
+  );
   const [filter, setFilter] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -76,7 +86,7 @@ export function ChapterReview({
     setSubmitError(null);
     try {
       await postDone(result);
-      clearViewedFiles();
+      clearReviewFileState();
       setSubmitted(true);
     } catch (e) {
       setSubmitError(String(e));
@@ -221,11 +231,13 @@ export function ChapterReview({
                     file={f}
                     settings={settings}
                     viewed={viewed.has(f.path)}
-                    // Stable ref (useCallback in useViewedFiles) — pass it
-                    // directly rather than re-wrapping it in a per-render arrow
-                    // closure, which is what keeps FileDiffCard's memo alive.
+                    collapsed={collapsed.has(f.path)}
+                    // Stable refs (useCallback in chapterFileSet / handleViewedChange)
+                    // — pass them directly rather than re-wrapping in per-render
+                    // arrow closures, which is what keeps FileDiffCard's memo alive.
                     // The card supplies the path.
-                    onToggleViewed={toggleViewed}
+                    onViewedChange={handleViewedChange}
+                    onSetCollapsed={setCollapsed}
                   />
                 </div>
               ))}

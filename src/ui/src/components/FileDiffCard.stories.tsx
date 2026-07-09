@@ -9,34 +9,30 @@ const meta = {
   parameters: {
     layout: "padded",
   },
+  args: {
+    file: fakeResolvedFile,
+    settings: DEFAULT_SETTINGS,
+    viewed: false,
+    collapsed: false,
+    onViewedChange: () => {},
+    onSetCollapsed: () => {},
+  },
 } satisfies Meta<typeof FileDiffCard>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Default: Story = {
-  args: {
-    file: fakeResolvedFile,
-    settings: DEFAULT_SETTINGS,
-    viewed: false,
-    onToggleViewed: () => {},
-  },
-};
+export const Default: Story = {};
 
 export const Viewed: Story = {
   args: {
-    file: fakeResolvedFile,
-    settings: DEFAULT_SETTINGS,
     viewed: true,
-    onToggleViewed: () => {},
+    collapsed: true,
   },
 };
 
 export const Binary: Story = {
   args: {
     file: { ...fakeResolvedFile, binary: true, hunks: [] },
-    settings: DEFAULT_SETTINGS,
-    viewed: false,
-    onToggleViewed: () => {},
   },
 };

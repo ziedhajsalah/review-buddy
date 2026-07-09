@@ -39,7 +39,7 @@ export function toDiffOptions(s: DisplaySettings): FileDiffOptions<undefined> {
   return {
     diffStyle: s.layout,
     diffIndicators: s.changeIndicator,
-    lineDiffType: s.granularity === "word" ? "word" : "none",
+    lineDiffType: s.granularity === "line" ? "none" : s.granularity,
     overflow: s.wrap ? "wrap" : "scroll",
     disableLineNumbers: !s.lineNumbers,
     disableBackground: !s.backgrounds,
