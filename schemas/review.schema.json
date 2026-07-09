@@ -7,6 +7,10 @@
   "additionalProperties": false,
   "required": ["prologue", "chapters"],
   "properties": {
+    "cwd": {
+      "type": "string",
+      "description": "Absolute path to the repository root (`git rev-parse --show-toplevel`). Required when the tool runs standalone (Cursor / VS Code Copilot / Codex) so it captures the diff from the right repo; ignored under Claude Code, where the hook supplies the cwd."
+    },
     "source": {
       "type": "object",
       "additionalProperties": false,

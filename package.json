@@ -16,9 +16,11 @@
     "typecheck": "tsc --noEmit",
     "typecheck:ui": "bun run --cwd src/ui typecheck",
     "build:ui": "bun run --cwd src/ui build",
+    "gen:prompts": "bun run scripts/gen-prompts.ts",
     "verify:dist-fresh": "git add --intent-to-add -- src/ui/dist && git diff --exit-code -- src/ui/dist",
+    "verify:prompts-fresh": "bun run gen:prompts && git add --intent-to-add -- integrations && git diff --exit-code -- integrations",
     "verify": "bun run test && bun run typecheck && bun run typecheck:ui && bun run test:ui",
-    "verify:ci": "bun run test && bun run typecheck && bun run build:ui && bun run test:ui && bun run verify:dist-fresh"
+    "verify:ci": "bun run test && bun run typecheck && bun run build:ui && bun run test:ui && bun run verify:dist-fresh && bun run verify:prompts-fresh"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.0",

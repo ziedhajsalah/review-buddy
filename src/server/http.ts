@@ -45,6 +45,10 @@ export interface DoneResult {
   verdict?: "approve" | "request_changes";
   /** Reviewer's overall note when requesting changes (markdown). */
   summary?: string;
+  /** True when the server was stopped before the reviewer finished (e.g. a
+   *  newer review superseded it) — `stop()` settles `done` with this so
+   *  awaiting callers never hang on a server that can't receive /api/done. */
+  superseded?: boolean;
 }
 
 export interface RunningServer {
@@ -186,7 +190,12 @@ export function startServer(ctx: ServerContext): RunningServer {
     token,
     url: `http://127.0.0.1:${port}/?token=${token}`,
     done,
-    stop: () => server.stop(), // graceful: let any in-flight response finish
+    stop: () => {
+      server.stop(); // graceful: let any in-flight response finish
+      // A stopped server can never receive /api/done — settle `done` so any
+      // awaiting caller unblocks. No-op when the reviewer already resolved it.
+      resolveDone({ superseded: true });
+    },
   };
 }
 

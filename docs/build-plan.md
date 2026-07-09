@@ -54,6 +54,14 @@ path (`parseDiffFromFile` → `<FileDiff expandUnchanged>`); see
 `docs/DESIGN-expand-full-file.md`. Still open: "N unmodified lines" expanders
 *between* hunks, and rename base-side expansion (needs an endpoint allowlist change).
 
+**Multi-harness support ✅ shipped** (post-Phase 1): standalone MCP mode
+(`--standalone[=blocking]` server flag) where `submit_review` itself validates +
+captures + serves — detached (returns the viewer URL immediately; viewer lives
+in the MCP process) or blocking (Codex + `tool_timeout_sec`). Session lifecycle extracted
+to `src/server/session.ts` (shared with the hook); agent schema gained optional
+`cwd`; per-harness configs + ported prompts in `integrations/` (Cursor, VS Code
+Copilot, Codex); setup guide in `docs/HARNESSES.md`.
+
 ## Phase 2 — Progress & round-trip
 
 - Persist viewed state (files/chapters) → `POST /api/file-viewed`; reflect in

@@ -3,10 +3,16 @@
  *
  * The tool's inputSchema IS schemas/review.schema.json, so Claude Code
  * validates the agent's review (and makes the model retry on mismatch) BEFORE
- * the PreToolUse hook ever runs. The hook (src/cli/index.ts `open-review`)
- * does the real work — capture diff, render UI, block for the human. By the
- * time this handler runs, the human has already seen the review, so it just
- * acks back to the agent (Phase 1, one-way).
+ * the PreToolUse hook ever runs.
+ *
+ * Two operating modes (see src/mcp/standalone.ts):
+ *  - Claude Code (default): the PreToolUse hook (src/cli/index.ts `open-review`)
+ *    does the real work — capture diff, render UI, block for the human. By the
+ *    time this handler runs, the human has already seen the review, so it just
+ *    acks back to the agent (Phase 1, one-way).
+ *  - Standalone (`--standalone[=blocking]` flag, for Cursor / VS Code Copilot / Codex,
+ *    which have no PreToolUse equivalent): the handler itself opens the review
+ *    session. See docs/HARNESSES.md.
  *
  * Registered with Claude Code as MCP server "review-buddy". As a plugin-bundled
  * server, its tool's callable name is `mcp__plugin_review-buddy_review-buddy__submit_review`
@@ -21,6 +27,10 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
+// Only the flag parser is imported eagerly — the standalone handler (and the
+// whole review-session stack behind it) loads lazily, so the default Claude
+// Code mode pays nothing for machinery only other harnesses use.
+import { standaloneMode } from "./mode.ts";
 
 // Load the JSON Schema as the single source of truth; strip JSON-Schema meta
 // keywords MCP inputSchema doesn't need.
@@ -32,6 +42,8 @@ void $schema;
 void $id;
 void title;
 
+const MODE = standaloneMode();
+
 const TOOL_DESCRIPTION = [
   "Submit a structured narrative code review of the current PR / working-tree diff.",
   "Provide a Prologue (why / what / key changes / review focus) and ordered, risk-rated",
@@ -40,6 +52,12 @@ const TOOL_DESCRIPTION = [
   "diff line content; the tool attaches the authoritative lines from git. Omit a file's",
   "`hunks` to mean 'the whole file belongs to this chapter'. Calling this opens the review",
   "in the reviewer's browser.",
+  ...(MODE !== "off"
+    ? [
+        "ALWAYS set `cwd` to the absolute repository root (run `git rev-parse --show-toplevel`)",
+        "so the tool captures the diff from the right repo.",
+      ]
+    : []),
 ].join(" ");
 
 // Version comes from package.json so release.sh's bump covers this too —
@@ -63,6 +81,10 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
       isError: true,
     };
   }
+  if (MODE !== "off") {
+    const { handleStandaloneSubmit } = await import("./standalone.ts");
+    return handleStandaloneSubmit(req.params.arguments, MODE);
+  }
   return {
     content: [
       {
@@ -74,4 +96,6 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
 });
 
 await server.connect(new StdioServerTransport());
-console.error("[review-buddy] MCP server ready (tool: submit_review).");
+console.error(
+  `[review-buddy] MCP server ready (tool: submit_review${MODE !== "off" ? `, standalone: ${MODE}` : ""}).`,
+);
