@@ -37,7 +37,24 @@ Review Buddy is a **Claude Code plugin**. It registers an MCP server (`review-bu
 
 ### Install
 
-The viewer ships **prebuilt** in the repo, so there's no build step — clone, register, install.
+The viewer ships **prebuilt** in the repo, so there's no build step on either path.
+
+#### Quick install (from GitHub)
+
+Claude Code can add the marketplace directly from GitHub — it clones the repo into its local plugin cache for you. No manual `git clone` and no `bun install` needed.
+
+```text
+/plugin marketplace add ziedhajsalah/review-buddy
+/plugin install review-buddy@review-buddy
+```
+
+[Bun](https://bun.sh) is still required — the plugin's MCP server and hook run on it. The cached copy has no `node_modules`; Bun auto-installs the two runtime dependencies (`@modelcontextprotocol/sdk`, `zod`) on first launch, so that first launch needs network access and may take a few extra seconds.
+
+Restart Claude Code (or reload plugins) if prompted, so the MCP server and hook load.
+
+#### Install from a local clone
+
+For development, or if you'll also use the standalone harnesses (Cursor / Copilot / Codex — see below), clone the repo and install deps yourself:
 
 ```bash
 # 1. Clone and install the backend deps (for the MCP server + hook)
@@ -69,14 +86,16 @@ The agent tells the hook what it reviewed (working tree vs PR) so the hook captu
 
 ### Other harnesses (Cursor / VS Code Copilot / Codex)
 
-There's no plugin or hook outside Claude Code — instead you register the same MCP server with the `--standalone` flag, and `submit_review` itself captures the diff and opens the viewer. The clone + `bun install` steps above are the only prerequisite. Copy the MCP config and review prompt for your harness from [`integrations/`](integrations) and follow the per-harness steps in [`docs/HARNESSES.md`](docs/HARNESSES.md).
+There's no plugin or hook outside Claude Code — instead you register the same MCP server with the `--standalone` flag, and `submit_review` itself captures the diff and opens the viewer. The **Install from a local clone** path above is the one you need. Copy the MCP config and review prompt for your harness from [`integrations/`](integrations) and follow the per-harness steps in [`docs/HARNESSES.md`](docs/HARNESSES.md).
 
 ### Update / uninstall
 
 ```text
-/plugin marketplace update review-buddy    # after a git pull (viewer is prebuilt — no rebuild)
+/plugin marketplace update review-buddy    # viewer is prebuilt — no rebuild
 /plugin uninstall review-buddy@review-buddy
 ```
+
+GitHub-sourced installs refresh from GitHub directly. Path-sourced installs (local clone): `git pull` first.
 
 ### Troubleshooting
 
