@@ -1,11 +1,12 @@
 import { expect, spyOn, test } from "bun:test";
 import { execFileSync } from "node:child_process";
 import * as childProcess from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parseDiff } from "./diff.ts";
 import { assertPrRef, assertSafeRef, captureDiff, capturePr, capturePrDiff, ensureCommit, fileContent, resolveBase } from "./git.ts";
+import { makeTempRepo } from "../test-helpers.ts";
 
 test("assertSafeRef rejects flag-smuggling refs, accepts real refs", () => {
   expect(() => assertSafeRef("-O/tmp/x")).toThrow();
@@ -59,6 +60,25 @@ test("captureDiff includes untracked files with special-character names", () => 
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test("fileContent (worktree head) refuses a symlink escaping the repo", () => {
+  const repo = makeTempRepo("rb-symlink-");
+  const outside = mkdtempSync(join(tmpdir(), "rb-outside-"));
+  const secret = join(outside, "secret.txt");
+  writeFileSync(secret, "SENSITIVE");
+  symlinkSync(secret, join(repo, "leak.txt"));
+  const out = fileContent(repo, "leak.txt", "head", "HEAD", undefined);
+  expect(out).toBe(""); // never the secret's bytes
+  rmSync(outside, { recursive: true, force: true });
+  rmSync(repo, { recursive: true, force: true });
+});
+
+test("fileContent (worktree head) still reads a normal in-repo file", () => {
+  const repo = makeTempRepo("rb-normal-");
+  const out = fileContent(repo, "app.ts", "head", "HEAD", undefined);
+  expect(out).toContain("let z = 3;");
+  rmSync(repo, { recursive: true, force: true });
 });
 
 test("fileContent head side reads a git object when a headRef SHA is given", () => {

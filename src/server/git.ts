@@ -4,8 +4,8 @@
  * never stages, commits, or resets the user's working tree.
  */
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
+import { join, sep } from "node:path";
 import type { PrMetadata } from "../types/review.ts";
 
 /** git's hash of the empty tree — used to diff a repo with no commits yet. */
@@ -219,7 +219,21 @@ export function fileContent(
     if (headRef) return git(cwd, ["show", `${headRef}:${path}`], true);
     if (headRef === null) return ""; // PR mode, content unavailable — never leak worktree bytes
     const abs = join(cwd, path);
-    return existsSync(abs) ? readFileSync(abs, "utf8") : "";
+    if (!existsSync(abs)) return "";
+    // abs may be (or pass through) a symlink pointing OUTSIDE the repo. The caller's
+    // lexical isInside() can't catch that, since resolve() doesn't dereference
+    // links. Realpath both sides and confirm containment before we read: a link
+    // that escapes the repo must never be served as repo content.
+    let real: string;
+    let root: string;
+    try {
+      real = realpathSync(abs);
+      root = realpathSync(cwd);
+    } catch {
+      return "";
+    }
+    if (real !== root && !real.startsWith(root + sep)) return "";
+    return readFileSync(real, "utf8");
   }
   const ref = baseRef === EMPTY_TREE ? "" : baseRef;
   if (!ref) return "";

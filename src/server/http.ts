@@ -17,7 +17,7 @@ import type { ResolvedReview } from "../types/review.ts";
 import { fileContent } from "./git.ts";
 import { languageOf } from "./diff.ts";
 
-/** True iff `rel` resolves to a path inside `root` (blocks `..` / symlink escape). */
+/** True iff `rel` resolves lexically inside `root` (blocks `..` only; does not dereference symlinks — link escape is guarded at read time in fileContent). */
 function isInside(root: string, rel: string): boolean {
   const r = resolve(root);
   const t = resolve(root, rel);
