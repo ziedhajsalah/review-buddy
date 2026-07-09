@@ -85,6 +85,11 @@ export interface AgentReview {
   chapters: AgentChapter[];
   /** How to capture the diff (see ReviewSource). Omit ⇒ worktree. */
   source?: ReviewSource;
+  /**
+   * Absolute repo root. Standalone (non-Claude Code) harnesses only — there is
+   * no hook event to supply a cwd, so the agent passes it. Ignored by the hook.
+   */
+  cwd?: string;
 }
 
 /* ------------------------------------------------------------------ */

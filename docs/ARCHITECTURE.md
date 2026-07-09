@@ -2,6 +2,8 @@
 
 How the PRD's product requirements map onto a concrete, buildable system. Read `CLAUDE.md` first for the high-level decisions; this doc is the engineering detail. For a visual walkthrough of the same system, open [`architecture.html`](./architecture.html) in a browser.
 
+> This doc describes the Claude Code flow (hook-driven, blocking). In other harnesses (Cursor / VS Code Copilot / Codex) the same MCP server runs in **standalone mode**: no hook — `submit_review` itself does the capture → merge → serve steps below and returns the viewer URL immediately. See [`HARNESSES.md`](./HARNESSES.md).
+
 ## Data flow
 
 ```

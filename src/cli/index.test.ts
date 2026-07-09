@@ -1,49 +1,20 @@
 import { afterAll, beforeAll, expect, test } from "bun:test";
 import { execFileSync } from "node:child_process";
-import { closeSync, mkdtempSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { closeSync, openSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { AgentReview } from "../types/review.ts";
+import { makeTempRepo, sampleReview, testGit, VIEWER_URL_RE } from "../test-helpers.ts";
 
 let dir: string;
 
 beforeAll(() => {
-  dir = mkdtempSync(join(tmpdir(), "rb-cli-"));
-  const git = (...args: string[]) => execFileSync("git", args, { cwd: dir, encoding: "utf8" });
-  git("init", "-q");
-  git("config", "user.email", "t@t.t");
-  git("config", "user.name", "t");
-  git("config", "commit.gpgsign", "false");
-  writeFileSync(join(dir, "app.ts"), "let x = 1;\nlet y = 2;\n");
-  git("add", "-A");
-  git("commit", "-q", "-m", "base");
-  writeFileSync(join(dir, "app.ts"), "let x = 1;\nlet y = 20;\nlet z = 3;\n");
+  dir = makeTempRepo("rb-cli-");
 });
 
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
 
 test("open-review: stdin hook event -> serves review -> returns allow on Done", async () => {
-  const agent: AgentReview = {
-    prologue: {
-      why: "y is wrong",
-      what: "fix y and add z",
-      key_changes: [
-        { headline: "Fix y", detail: "20 not 2" },
-        { headline: "Add z", detail: "new binding" },
-      ],
-      review_focus: { summary: "check z is used", file: "app.ts" },
-    },
-    chapters: [
-      {
-        index: 1,
-        title: "Adjust bindings",
-        risk: "Low",
-        risk_reason: "tiny",
-        description: "edits y and adds z",
-        files: [{ path: "app.ts", change_type: "modified" }],
-      },
-    ],
-  };
+  const agent = sampleReview();
   const event = {
     tool_name: "mcp__plugin_review-buddy_review-buddy__submit_review",
     tool_input: agent,
@@ -70,7 +41,7 @@ test("open-review: stdin hook event -> serves review -> returns allow on Done", 
   // Discover the ephemeral port + token from the stderr file.
   let m: RegExpMatchArray | null = null;
   for (let i = 0; i < 100 && !m; i++) {
-    m = readFileSync(errPath, "utf8").match(/http:\/\/127\.0\.0\.1:(\d+)\/\?token=([\w-]+)/);
+    m = readFileSync(errPath, "utf8").match(VIEWER_URL_RE);
     if (!m) await Bun.sleep(50);
   }
   expect(m).not.toBeNull();
@@ -98,27 +69,7 @@ test("open-review: stdin hook event -> serves review -> returns allow on Done", 
 }, 20_000);
 
 test("open-review: request_changes verdict returns deny with the summary (roundtrip flag)", async () => {
-  const agent: AgentReview = {
-    prologue: {
-      why: "y is wrong",
-      what: "fix y and add z",
-      key_changes: [
-        { headline: "Fix y", detail: "20 not 2" },
-        { headline: "Add z", detail: "new binding" },
-      ],
-      review_focus: { summary: "check z is used", file: "app.ts" },
-    },
-    chapters: [
-      {
-        index: 1,
-        title: "Adjust bindings",
-        risk: "Low",
-        risk_reason: "tiny",
-        description: "edits y and adds z",
-        files: [{ path: "app.ts", change_type: "modified" }],
-      },
-    ],
-  };
+  const agent = sampleReview();
   const event = {
     tool_name: "mcp__plugin_review-buddy_review-buddy__submit_review",
     tool_input: agent,
@@ -142,7 +93,7 @@ test("open-review: request_changes verdict returns deny with the summary (roundt
 
   let m: RegExpMatchArray | null = null;
   for (let i = 0; i < 100 && !m; i++) {
-    m = readFileSync(errPath, "utf8").match(/http:\/\/127\.0\.0\.1:(\d+)\/\?token=([\w-]+)/);
+    m = readFileSync(errPath, "utf8").match(VIEWER_URL_RE);
     if (!m) await Bun.sleep(50);
   }
   expect(m).not.toBeNull();
@@ -175,27 +126,7 @@ test("open-review: request_changes verdict returns deny with the summary (roundt
 }, 20_000);
 
 test("open-review: non-string summary still emits a valid deny (no crash / fail-open)", async () => {
-  const agent: AgentReview = {
-    prologue: {
-      why: "y is wrong",
-      what: "fix y and add z",
-      key_changes: [
-        { headline: "Fix y", detail: "20 not 2" },
-        { headline: "Add z", detail: "new binding" },
-      ],
-      review_focus: { summary: "check z is used", file: "app.ts" },
-    },
-    chapters: [
-      {
-        index: 1,
-        title: "Adjust bindings",
-        risk: "Low",
-        risk_reason: "tiny",
-        description: "edits y and adds z",
-        files: [{ path: "app.ts", change_type: "modified" }],
-      },
-    ],
-  };
+  const agent = sampleReview();
   const event = {
     tool_name: "mcp__plugin_review-buddy_review-buddy__submit_review",
     tool_input: agent,
@@ -219,7 +150,7 @@ test("open-review: non-string summary still emits a valid deny (no crash / fail-
 
   let m: RegExpMatchArray | null = null;
   for (let i = 0; i < 100 && !m; i++) {
-    m = readFileSync(errPath, "utf8").match(/http:\/\/127\.0\.0\.1:(\d+)\/\?token=([\w-]+)/);
+    m = readFileSync(errPath, "utf8").match(VIEWER_URL_RE);
     if (!m) await Bun.sleep(50);
   }
   expect(m).not.toBeNull();
@@ -255,32 +186,10 @@ test("open-review: non-string summary still emits a valid deny (no crash / fail-
 test("open-review: source.type=branch captures the diff against the given base ref", async () => {
   // Commit the pending change, then review it against the base commit via a
   // branch source — exercises the source-routing added for PR/branch reviews.
-  const git = (...args: string[]) => execFileSync("git", args, { cwd: dir, encoding: "utf8" });
-  git("add", "-A");
-  git("commit", "-q", "-m", "change");
+  testGit(dir, "add", "-A");
+  testGit(dir, "commit", "-q", "-m", "change");
 
-  const agent: AgentReview = {
-    source: { type: "branch", ref: "HEAD~1" },
-    prologue: {
-      why: "y is wrong",
-      what: "fix y and add z",
-      key_changes: [
-        { headline: "Fix y", detail: "20 not 2" },
-        { headline: "Add z", detail: "new binding" },
-      ],
-      review_focus: { summary: "check z is used", file: "app.ts" },
-    },
-    chapters: [
-      {
-        index: 1,
-        title: "Adjust bindings",
-        risk: "Low",
-        risk_reason: "tiny",
-        description: "edits y and adds z",
-        files: [{ path: "app.ts", change_type: "modified" }],
-      },
-    ],
-  };
+  const agent = sampleReview({ source: { type: "branch", ref: "HEAD~1" } });
   const event = { tool_name: "mcp__review-buddy__submit_review", tool_input: agent, cwd: dir };
 
   const outPath = join(tmpdir(), `rb-cli-out2-${process.pid}.txt`);
@@ -300,7 +209,7 @@ test("open-review: source.type=branch captures the diff against the given base r
 
   let m: RegExpMatchArray | null = null;
   for (let i = 0; i < 100 && !m; i++) {
-    m = readFileSync(errPath, "utf8").match(/http:\/\/127\.0\.0\.1:(\d+)\/\?token=([\w-]+)/);
+    m = readFileSync(errPath, "utf8").match(VIEWER_URL_RE);
     if (!m) await Bun.sleep(50);
   }
   expect(m).not.toBeNull();
@@ -318,27 +227,8 @@ test("open-review: source.type=branch captures the diff against the given base r
 }, 20_000);
 
 test("open-review: invalid chapter index fails open without starting server", async () => {
-  const agent: AgentReview = {
-    prologue: {
-      why: "y is wrong",
-      what: "fix y and add z",
-      key_changes: [
-        { headline: "Fix y", detail: "20 not 2" },
-        { headline: "Add z", detail: "new binding" },
-      ],
-      review_focus: { summary: "check z is used", file: "app.ts" },
-    },
-    chapters: [
-      {
-        index: -1,
-        title: "Adjust bindings",
-        risk: "Low",
-        risk_reason: "tiny",
-        description: "edits y and adds z",
-        files: [{ path: "app.ts", change_type: "modified" }],
-      },
-    ],
-  };
+  const agent = sampleReview();
+  agent.chapters[0]!.index = -1; // fails the hook's structural backstop
   const event = {
     tool_name: "mcp__plugin_review-buddy_review-buddy__submit_review",
     tool_input: agent,

@@ -13,35 +13,16 @@
  *                          same viewer against the current repo — for testing
  *                          the UI without going through the agent/hook.
  */
-import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
-import type { AgentReview, ReviewMeta } from "../types/review.ts";
-import { assertSafeRef, captureDiff, capturePr, capturePrDiff, ensureCommit, prBaseRef, resolveBase } from "../server/git.ts";
-import { resolveReview } from "../server/resolve.ts";
-import { startServer, type DoneResult } from "../server/http.ts";
-import { openBrowser } from "../server/browser.ts";
-import { validateAgentReview } from "./validate.ts";
+import { readFileSync } from "node:fs";
+import type { AgentReview } from "../types/review.ts";
+import type { DoneResult } from "../server/http.ts";
+import { openReviewSession, requestChangesMessage } from "../server/session.ts";
+import { validateAgentReview } from "../server/validate.ts";
 
 interface HookEvent {
   tool_name?: string;
   tool_input?: AgentReview;
   cwd?: string;
-}
-
-const repoRoot = join(import.meta.dir, "..", "..");
-
-function uiDir(): string | undefined {
-  const dir = join(repoRoot, "src", "ui", "dist");
-  return existsSync(join(dir, "index.html")) ? dir : undefined;
-}
-
-function buildMeta(): ReviewMeta {
-  return {
-    aiGenerated: true,
-    generatedBy: process.env.REVIEW_BUDDY_MODEL ?? "claude",
-    generatedAt: new Date().toISOString(),
-    promptVersion: "1",
-  };
 }
 
 /** Print a PreToolUse permission decision and exit. */
@@ -67,64 +48,9 @@ function deny(reason: string): never {
   respond("deny", reason);
 }
 
-/**
- * Capture the authoritative diff (source B) matching what the agent reviewed.
- * `agent.source` tells us which — the hook can't see `/review`'s arguments, so
- * without this a PR review would re-capture the local working tree (empty) and
- * render no hunks. `base` is the ref used for full-file expansion (source C).
- */
-function captureForSource(
-  agent: AgentReview,
-  cwd: string,
-): { diff: string; pr: ReturnType<typeof capturePr>; base: string; headRef?: string | null } {
-  const source = agent.source ?? { type: "worktree" };
-
-  if (source.type === "pr" && source.ref) {
-    const pr = capturePr(cwd, "HEAD", source.ref);
-    // The PR's reviewed state is a commit, not the local working tree. Fetch it
-    // once (at hook startup, not per-request); null = unavailable, in which case
-    // full-file expansion is disabled rather than leaking worktree bytes.
-    const headRef =
-      pr.headRefOid && ensureCommit(cwd, pr.headRefOid, source.ref) ? pr.headRefOid : null;
-    // Base side: merge-base of the PR head and its base branch when we have the
-    // head SHA; otherwise keep the base branch name.
-    const base = typeof headRef === "string" ? prBaseRef(cwd, headRef, pr.base) : pr.base;
-    return { diff: capturePrDiff(cwd, source.ref), pr, base, headRef };
-  }
-
-  let base: string;
-  if (source.type === "branch" && source.ref) {
-    assertSafeRef(source.ref); // ref flows into `git diff <ref>` — block flag smuggling
-    base = source.ref;
-  } else {
-    base = resolveBase(cwd, process.env.REVIEW_BUDDY_BASE);
-  }
-  return { diff: captureDiff(cwd, base), pr: capturePr(cwd, base), base };
-}
-
+/** Open a session (capture/resolve/serve/browser) and block until Done. */
 async function serveAndBlock(agent: AgentReview, cwd: string): Promise<DoneResult> {
-  const { diff, pr, base, headRef } = captureForSource(agent, cwd);
-  const { review, warnings } = resolveReview(agent, diff, buildMeta(), pr);
-  for (const w of warnings) console.error(`[review-buddy] ${w}`);
-  if (headRef === null) {
-    console.error("[review-buddy] PR head not fetchable — full-file expansion disabled.");
-  }
-
-  const server = startServer({
-    review,
-    cwd,
-    baseRef: base,
-    headRef,
-    uiDir: uiDir(),
-    roundtrip: !!process.env.REVIEW_BUDDY_ROUNDTRIP,
-  });
-  console.error(`[review-buddy] Review ready at ${server.url}`);
-  if (process.env.REVIEW_BUDDY_NO_OPEN) {
-    console.error(`[review-buddy] REVIEW_BUDDY_NO_OPEN set — not opening a browser.`);
-  } else if (!openBrowser(server.url)) {
-    console.error(`[review-buddy] Could not open a browser — open the URL above manually.`);
-  }
-
+  const server = openReviewSession(agent, cwd);
   const result = await server.done;
   server.stop();
   return result;
@@ -156,12 +82,7 @@ async function runOpenReview(): Promise<never> {
     allow("Review Buddy hit an error rendering the review; proceeding.");
   }
   if (process.env.REVIEW_BUDDY_ROUNDTRIP && result?.verdict === "request_changes") {
-    const note = typeof result.summary === "string" ? result.summary.trim() : "";
-    deny(
-      note
-        ? `Reviewer requested changes:\n\n${note}`
-        : "Reviewer requested changes (no details provided) — re-examine the flagged chapters.",
-    );
+    deny(requestChangesMessage(result.summary));
   }
   allow("Review viewed by the human.");
 }

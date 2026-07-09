@@ -226,3 +226,19 @@ export function fileContent(
   assertSafeRef(ref);
   return git(cwd, ["show", `${ref}:${path}`], true);
 }
+
+/**
+ * Absolute repo toplevel for `cwd`, or null when `cwd` doesn't exist or isn't
+ * inside a git work tree. Used by the standalone MCP mode, where — unlike the
+ * hook, which is handed the session cwd — the repo location must be validated
+ * from the agent's `cwd` field / env / process.cwd().
+ */
+export function repoToplevel(cwd: string): string | null {
+  if (!existsSync(cwd)) return null;
+  try {
+    const out = git(cwd, ["rev-parse", "--show-toplevel"]).trim();
+    return out || null;
+  } catch {
+    return null;
+  }
+}

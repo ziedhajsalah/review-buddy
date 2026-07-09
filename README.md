@@ -1,6 +1,6 @@
 # Review Buddy
 
-AI-assisted **narrative code review** for Claude Code.
+AI-assisted **narrative code review** for Claude Code — and, via standalone MCP mode, for Cursor, VS Code Copilot, and Codex.
 
 Most PRs are reviewed as an undifferentiated wall of diffs. Review Buddy reframes a PR as a guided reading: an AI agent reads the changes, writes a high-level **Prologue** (why / what / key changes / where to focus), and segments the work into risk-rated thematic **Chapters** you walk through in a browser.
 
@@ -12,6 +12,8 @@ Most PRs are reviewed as an undifferentiated wall of diffs. Review Buddy reframe
 4. A prebuilt React app renders the Prologue and Chapters, with a rich unified/split diff viewer.
 
 The agent provides **judgment and structure**; the actual diff bytes come from git. This **reference-not-reproduce** rule is load-bearing — the agent never echoes diff content, so it can't fabricate changes. See `CLAUDE.md` for the full architecture.
+
+**Not on Claude Code?** The same MCP server runs standalone in Cursor, VS Code Copilot (agent mode), and Codex — `submit_review` itself captures the diff and opens the viewer instead of relying on the `PreToolUse` hook. Setup per harness: [`docs/HARNESSES.md`](docs/HARNESSES.md), ready-to-copy configs + prompts: [`integrations/`](integrations).
 
 ## Status
 
@@ -65,6 +67,10 @@ The agent tells the hook what it reviewed (working tree vs PR) so the hook captu
 
 > For a PR whose branch isn't checked out, the diff renders fully, but "expand full file" may be empty (those bytes aren't on disk).
 
+### Other harnesses (Cursor / VS Code Copilot / Codex)
+
+There's no plugin or hook outside Claude Code — instead you register the same MCP server with the `--standalone` flag, and `submit_review` itself captures the diff and opens the viewer. The clone + `bun install` steps above are the only prerequisite. Copy the MCP config and review prompt for your harness from [`integrations/`](integrations) and follow the per-harness steps in [`docs/HARNESSES.md`](docs/HARNESSES.md).
+
 ### Update / uninstall
 
 ```text
@@ -85,9 +91,10 @@ src/
   server/            # diff capture, chapter resolution, local HTTP server, browser open
   ui/                # Vite + React 19 + Tailwind v4 viewer (@pierre/diffs)
   types/review.ts    # shared agent + UI/server contracts
-docs/                # PRD, ARCHITECTURE, review-contract, build-plan
+docs/                # PRD, ARCHITECTURE, review-contract, build-plan, HARNESSES
 schemas/             # review.schema.json = submit_review input schema
 examples/hooks.json  # example Claude Code plugin hook config
+integrations/        # Cursor / VS Code Copilot / Codex configs + review prompts
 ```
 
 ## Development
