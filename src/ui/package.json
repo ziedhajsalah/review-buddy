@@ -25,6 +25,9 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@happy-dom/global-registrator": "^15",
+    "@testing-library/dom": "^10",
+    "@testing-library/react": "^16",
     "@tailwindcss/vite": "^4.1.0",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
