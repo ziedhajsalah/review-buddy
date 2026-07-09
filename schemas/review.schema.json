@@ -26,7 +26,13 @@
           "type": "string",
           "description": "PR number or URL when type='pr'; base ref (e.g. 'main') when type='branch'. Omit for 'worktree'."
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "type": { "enum": ["pr", "branch"] } } },
+          "then": { "required": ["ref"] }
+        }
+      ]
     },
     "prologue": {
       "type": "object",

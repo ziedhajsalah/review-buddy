@@ -22,13 +22,29 @@ const Chapter = z.object({
   description: z.string(),
   files: z.array(AgentFile).min(1),
 });
+const Source = z
+  .object({
+    type: z.enum(["worktree", "pr", "branch"]),
+    ref: z.string().min(1).optional(),
+  })
+  .superRefine((s, ctx) => {
+    if (s.type !== "worktree" && !s.ref) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["ref"],
+        message: `source.ref is required when source.type is "${s.type}"`,
+      });
+    }
+  });
 
 /** Structural schema for the agent's review payload (hook backstop; mirrors the
  *  load-bearing constraints of schemas/review.schema.json, not every field).
- *  Unknown keys (e.g. `source`, advisory `stats`) are ignored, not rejected. */
+ *  When present, `source` is validated; unknown keys (e.g. advisory `stats`) are
+ *  ignored, not rejected. */
 export const AgentReviewSchema = z.object({
   prologue: Prologue,
   chapters: z.array(Chapter).min(1),
+  source: Source.optional(),
 });
 
 /**
