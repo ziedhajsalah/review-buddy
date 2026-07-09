@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { ChapterReview } from "./ChapterReview.tsx";
 import { fakeResolvedReview } from "../stories/fixtures.ts";
+import { ChapterReview } from "./ChapterReview.tsx";
 
 const meta = {
   title: "Components/ChapterReview",

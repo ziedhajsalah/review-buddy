@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import type { ResolvedReview } from "../../types/review.ts";
 import { fetchReview } from "./api.ts";
-import { Overview } from "./components/Overview.tsx";
 import { ChapterReview } from "./components/ChapterReview.tsx";
+import { Overview } from "./components/Overview.tsx";
 
 type View = { mode: "overview" } | { mode: "chapter"; position: number };
 
@@ -19,18 +19,14 @@ export function App() {
     return (
       <div className="mx-auto max-w-xl p-10 text-center">
         <h1 className="mb-2 text-lg font-semibold">Couldn’t load the review</h1>
-        <p className="font-mono text-sm text-muted-foreground">
-          {error}
-        </p>
+        <p className="font-mono text-sm text-muted-foreground">{error}</p>
       </div>
     );
   }
 
   if (!review) {
     return (
-      <div className="grid h-full place-items-center text-muted-foreground">
-        Loading review…
-      </div>
+      <div className="grid h-full place-items-center text-muted-foreground">Loading review…</div>
     );
   }
 

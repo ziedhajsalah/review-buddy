@@ -6,11 +6,14 @@
  * parseDiffFromFile, then <FileDiff> renders it with expandUnchanged. The bytes
  * are git's (reference-not-reproduce); we only re-frame them.
  */
-import { parseDiffFromFile, type FileDiffMetadata } from "@pierre/diffs";
+import { type FileDiffMetadata, parseDiffFromFile } from "@pierre/diffs";
 import type { ResolvedFile } from "../../../types/review.ts";
 
 /** Which sides must carry real bytes for a faithful full-file diff of this change. */
-export function requiredSides(changeType: ResolvedFile["change_type"]): { base: boolean; head: boolean } {
+export function requiredSides(changeType: ResolvedFile["change_type"]): {
+  base: boolean;
+  head: boolean;
+} {
   return { base: changeType !== "added", head: changeType !== "deleted" };
 }
 
@@ -26,7 +29,11 @@ export function canExpand(file: ResolvedFile, base: string, head: string): boole
 }
 
 /** Rebuild a whole-file (isPartial:false) diff so <FileDiff> can expandUnchanged. */
-export function buildExpandedDiff(file: ResolvedFile, base: string, head: string): FileDiffMetadata {
+export function buildExpandedDiff(
+  file: ResolvedFile,
+  base: string,
+  head: string,
+): FileDiffMetadata {
   return parseDiffFromFile(
     { name: file.old_path ?? file.path, contents: base },
     { name: file.path, contents: head },

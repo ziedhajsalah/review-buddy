@@ -1,11 +1,11 @@
 import { useState } from "react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import type { ResolvedReview } from "../../../types/review.ts";
-import { RiskBadge } from "./RiskBadge.tsx";
 import { DiffStat } from "./DiffStat.tsx";
 import { Markdown } from "./Markdown.tsx";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
+import { RiskBadge } from "./RiskBadge.tsx";
 
 type Tab = "prologue" | "description";
 
@@ -34,7 +34,9 @@ export function Overview({
           <span aria-hidden>·</span>
           <DiffStat additions={stats.additions} deletions={stats.deletions} />
           <span aria-hidden>·</span>
-          <span>{stats.filesChanged} file{stats.filesChanged === 1 ? "" : "s"}</span>
+          <span>
+            {stats.filesChanged} file{stats.filesChanged === 1 ? "" : "s"}
+          </span>
           {meta.aiGenerated && (
             <Badge
               variant="outline"
@@ -64,8 +66,8 @@ export function Overview({
           </button>
           {warningsOpen && (
             <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
-              {warnings.map((w, i) => (
-                <li key={i}>{w}</li>
+              {warnings.map((w) => (
+                <li key={w}>{w}</li>
               ))}
             </ul>
           )}
@@ -92,8 +94,8 @@ export function Overview({
           </Block>
           <Block heading="Key changes">
             <ul className="space-y-1.5">
-              {prologue.key_changes.map((k, i) => (
-                <li key={i} className="leading-relaxed">
+              {prologue.key_changes.map((k) => (
+                <li key={k.headline} className="leading-relaxed">
                   <span className="font-semibold">{k.headline}</span>
                   <span className="text-muted-foreground">
                     {" — "}
@@ -180,6 +182,7 @@ function TabButton({
 }) {
   return (
     <button
+      type="button"
       onClick={onClick}
       className={cn(
         "-mb-px border-b-2 px-3 py-2 text-sm font-medium transition",

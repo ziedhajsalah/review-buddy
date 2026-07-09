@@ -63,9 +63,7 @@ const code: Components["code"] = ({ className, children }) => {
     (typeof children === "string" && children.includes("\n"));
   if (isBlock) return <code className={className}>{children}</code>;
   return (
-    <code
-      className="rounded border border-[var(--rb-code-border)] bg-[var(--rb-code-bg)] px-1.5 py-0.5 font-mono text-[0.85em] text-[var(--rb-code-fg)]"
-    >
+    <code className="rounded border border-[var(--rb-code-border)] bg-[var(--rb-code-bg)] px-1.5 py-0.5 font-mono text-[0.85em] text-[var(--rb-code-fg)]">
       {children}
     </code>
   );
@@ -94,10 +92,16 @@ const BLOCK_COMPONENTS: Components = {
   ...INLINE_MARKS,
   p: ({ children }) => <p className="mb-2.5 leading-relaxed last:mb-0">{children}</p>,
   ul: ({ children }) => <ul className="mb-2.5 list-disc space-y-1 pl-5 last:mb-0">{children}</ul>,
-  ol: ({ children }) => <ol className="mb-2.5 list-decimal space-y-1 pl-5 last:mb-0">{children}</ol>,
+  ol: ({ children }) => (
+    <ol className="mb-2.5 list-decimal space-y-1 pl-5 last:mb-0">{children}</ol>
+  ),
   li: ({ children }) => <li className="leading-relaxed">{children}</li>,
-  h1: ({ children }) => <h3 className="mt-4 mb-1.5 text-base font-semibold first:mt-0">{children}</h3>,
-  h2: ({ children }) => <h3 className="mt-4 mb-1.5 text-base font-semibold first:mt-0">{children}</h3>,
+  h1: ({ children }) => (
+    <h3 className="mt-4 mb-1.5 text-base font-semibold first:mt-0">{children}</h3>
+  ),
+  h2: ({ children }) => (
+    <h3 className="mt-4 mb-1.5 text-base font-semibold first:mt-0">{children}</h3>
+  ),
   h3: ({ children }) => <h4 className="mt-3 mb-1 text-sm font-semibold first:mt-0">{children}</h4>,
   h4: ({ children }) => <h4 className="mt-3 mb-1 text-sm font-semibold first:mt-0">{children}</h4>,
   blockquote: ({ children }) => (
@@ -123,9 +127,5 @@ const BLOCK_COMPONENTS: Components = {
       {children}
     </th>
   ),
-  td: ({ children }) => (
-    <td className="border border-border px-2.5 py-1.5">
-      {children}
-    </td>
-  ),
+  td: ({ children }) => <td className="border border-border px-2.5 py-1.5">{children}</td>,
 };

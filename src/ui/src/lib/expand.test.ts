@@ -1,7 +1,7 @@
 /// <reference types="bun-types" />
 import { expect, test } from "bun:test";
 import type { ResolvedFile } from "../../../types/review.ts";
-import { requiredSides, canExpand, buildExpandedDiff } from "./expand.ts";
+import { buildExpandedDiff, canExpand, requiredSides } from "./expand.ts";
 
 const fileDefaults = {
   additions: 0,
@@ -10,7 +10,9 @@ const fileDefaults = {
   hunks: [] as ResolvedFile["hunks"],
 };
 
-function makeFile(overrides: Partial<ResolvedFile> & Pick<ResolvedFile, "path" | "change_type">): ResolvedFile {
+function makeFile(
+  overrides: Partial<ResolvedFile> & Pick<ResolvedFile, "path" | "change_type">,
+): ResolvedFile {
   return { ...fileDefaults, ...overrides };
 }
 
@@ -51,7 +53,7 @@ test("canExpand: deleted with empty head → true", () => {
   expect(canExpand(file, "content\n", "")).toBe(true);
 });
 
-test("buildExpandedDiff: modified with trailing newline — byte-fidelity via join(\"\")", () => {
+test('buildExpandedDiff: modified with trailing newline — byte-fidelity via join("")', () => {
   const base = "line one\nline two\n";
   const head = "line one\nline two changed\n";
   const file = makeFile({ path: "x.ts", change_type: "modified" });

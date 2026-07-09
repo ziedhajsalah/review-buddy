@@ -345,8 +345,8 @@
   <h1>Review&nbsp;Buddy</h1>
   <p class="lede">A pull request isn't a wall of diffs — it's a story. An agent reads the changes, writes a <em>Prologue</em>, and segments the work into risk-rated <em>Chapters</em> you walk through in the browser.</p>
   <div class="tag">
-    <span class="pill live">v0.1.0 · Phase 1 shipped</span>
-    <span class="pill">Claude Code only</span>
+    <span class="pill live">v0.2.1 · Phase 1 complete</span>
+    <span class="pill">Claude Code · Cursor · Copilot · Codex</span>
     <span class="pill">MCP tool + PreToolUse hook</span>
     <span class="pill">reference-not-reproduce</span>
   </div>
@@ -496,6 +496,10 @@
 
     <div class="callout teal">
       <p><strong>The hook never sees your command.</strong> The agent's <code>submit_review</code> carries a <code>source</code> — <code>{ type: "worktree" }</code>, <code>{ type: "pr", ref }</code>, or <code>{ type: "branch", ref }</code> — so the hook re-captures the <em>same</em> diff the agent read. For a PR it runs <code>gh pr diff &lt;ref&gt;</code> against the PR's real bytes; without <code>source</code> the viewer would render empty. You never have to check the branch out.</p>
+    </div>
+
+    <div class="callout">
+      <p><strong>No hook? Standalone mode.</strong> In Cursor / VS Code Copilot / Codex there is no <code>PreToolUse</code> — the SAME MCP server runs with the <code>--standalone</code> flag, and <code>submit_review</code> itself performs the capture → merge → serve steps, returning the viewer URL immediately (detached) so harness tool-call timeouts (Cursor ~5 min hard, Copilot unconfigurable) can't kill a human review; Codex can opt into <code>--standalone=blocking</code> paired with <code>tool_timeout_sec</code>. The viewer lives inside the long-lived MCP process, and shutdown is wired to client disconnect + SIGINT/SIGTERM so an editor reload can't orphan the port. See <code>docs/HARNESSES.md</code>.</p>
     </div>
   </div>
 </section>
@@ -692,7 +696,7 @@
     <div class="sec-head">
       <span class="sec-num">06 — SERVER ENDPOINTS</span>
       <h2>A tiny REST surface on an ephemeral port</h2>
-      <p>One built React app fetches the review from a local server — loopback-only bind, Host-header validation, and a per-server token guard every <code style="font-family:var(--mono)">/api/*</code> route. JSON is runtime state served over REST; syntax highlighting (Shiki) and word-level diffing happen client-side. No per-review codegen or compile.</p>
+      <p>One built React app fetches the review from a local server — loopback-only bind, Host-header validation, and a per-server token guard every <code style="font-family:var(--mono)">/api/*</code> route, plus a hardened surface: self-only <strong>CSP</strong> + nosniff on responses, size caps on the agent payload, a body limit on <code style="font-family:var(--mono)">/api/done</code>, and symlink-safe file reads. JSON is runtime state served over REST; highlighting runs off the main thread in a worker pool, and word-level diffing happens client-side. No per-review codegen or compile.</p>
     </div>
 
     <table class="ep">
@@ -701,6 +705,7 @@
         <tr><td class="m">/api/review</td><td><span class="verb get">GET</span></td><td>Merged review: meta · pr · prologue · chapters · stats. Hunks resolved here.</td><td class="m">1 ✓</td></tr>
         <tr><td class="m">/api/file-content</td><td><span class="verb get">GET</span></td><td>Full file for expansion / word-level context <code style="font-family:var(--mono)">?path=&amp;side=</code> — PR-aware (reads the PR's bytes, never your worktree).</td><td class="m">1 ✓</td></tr>
         <tr><td class="m">/api/done</td><td><span class="verb post">POST</span></td><td>Reviewer closes the viewer; unblocks the hook (returns <code style="font-family:var(--mono)">allow</code>).</td><td class="m">1 ✓</td></tr>
+        <tr><td class="m">/api/config</td><td><span class="verb get">GET</span></td><td>Viewer capabilities — e.g. whether the round-trip verdict UI is enabled (<code style="font-family:var(--mono)">roundtrip</code>).</td><td class="m">1 ✓</td></tr>
         <tr class="ph2"><td class="m">/api/file-viewed</td><td><span class="verb post">POST</span></td><td>Persist per-file / chapter viewed state (round-trip).</td><td class="m">2</td></tr>
         <tr class="ph2"><td class="m">/api/feedback</td><td><span class="verb post">POST</span></td><td>Submit verdict + annotations; hook returns <code style="font-family:var(--mono)">deny</code> + feedback to the agent.</td><td class="m">2</td></tr>
         <tr class="ph2"><td class="m">/api/github/*</td><td class="m">—</td><td>Open PR, copy branch, CI status, reviewers (via <code style="font-family:var(--mono)">gh</code>).</td><td class="m">3</td></tr>
@@ -718,7 +723,7 @@
     <div class="sec-head">
       <span class="sec-num">07 — ROADMAP</span>
       <h2>Build the viewer first; round-trip is a drop-in</h2>
-      <p>The blocking hook stays from day one — so swapping the "Done" response for "approve / request-changes + annotations" later is a small change, not a rewrite. Phase 1 shipped in v0.1.0.</p>
+      <p>The blocking hook stays from day one — so swapping the "Done" response for "approve / request-changes + annotations" later is a small change, not a rewrite. Phase 1 shipped in v0.1.0; v0.2.x added standalone multi-harness support, an executed viewer test harness, off-thread highlighting, and a hardening pass.</p>
     </div>
 
     <div class="phases">
@@ -730,7 +735,7 @@
           <li>/review skill</li>
           <li>open-review hook</li>
           <li>Prologue · chapters · unified/split diff viewer</li>
-          <li><em>expand full file</em> — the one bit deferred</li>
+          <li>expand full file ✓ · multi-harness standalone ✓</li>
         </ul>
       </div>
       <div class="phase">
@@ -764,8 +769,8 @@
 </section>
 
 <footer>
-  <div class="mono">review-buddy · narrative code review for Claude Code · v0.1.0</div>
-  <div style="margin-top:8px">A companion illustration to <span class="mono">docs/ARCHITECTURE.md</span> · see <span class="mono">CLAUDE.md</span> for the source of truth · inspired by <a href="https://github.com/backnotprop/plannotator">Plannotator</a>.</div>
+  <div class="mono">review-buddy · narrative code review for Claude Code · v0.2.1</div>
+  <div style="margin-top:8px">A companion illustration to <span class="mono">docs/ARCHITECTURE.md</span> · hand-maintained — update alongside <span class="mono">ARCHITECTURE.md</span> when the architecture changes · see <span class="mono">CLAUDE.md</span> for the source of truth · inspired by <a href="https://github.com/backnotprop/plannotator">Plannotator</a>.</div>
 </footer>
 
 </body>

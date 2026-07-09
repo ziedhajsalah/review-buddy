@@ -1,6 +1,6 @@
 # Architecture
 
-How the PRD's product requirements map onto a concrete, buildable system. Read `CLAUDE.md` first for the high-level decisions; this doc is the engineering detail. For a visual walkthrough of the same system, open [`architecture.html`](./architecture.html) in a browser.
+How the PRD's product requirements map onto a concrete, buildable system. Read `CLAUDE.md` first for the high-level decisions; this doc is the engineering detail. For a visual walkthrough of the same system, open [`architecture.html`](./architecture.html) in a browser (hand-maintained — keep it in sync with this doc).
 
 > This doc describes the Claude Code flow (hook-driven, blocking). In other harnesses (Cursor / VS Code Copilot / Codex) the same MCP server runs in **standalone mode**: no hook — `submit_review` itself does the capture → merge → serve steps below and returns the viewer URL immediately. See [`HARNESSES.md`](./HARNESSES.md).
 
@@ -69,7 +69,7 @@ The structuring prompt's original output format had the agent transcribe diff li
 
 - Plugin `hooks.json` registers a **`PreToolUse`** hook. A plugin-bundled MCP server names its tools `mcp__plugin_<plugin>_<server>__<tool>`, so the real tool name is `mcp__plugin_review-buddy_review-buddy__submit_review` (a user-configured `.mcp.json` server would instead use `mcp__review-buddy__submit_review`). The matcher is an alternation covering both forms. See `examples/hooks.json` and [the MCP docs](https://code.claude.com/docs/en/mcp#plugin-provided-mcp-servers).
 - The hook command receives the tool call on stdin: `{ tool_name, tool_input: <review JSON>, cwd, session_id, transcript_path, permission_mode }`.
-- **The hook re-captures the diff (source B) — and must capture the SAME one the agent reviewed.** It never sees `/review`'s arguments, so the agent's payload carries a `source`: `worktree` (default → `git diff HEAD`), `pr` → `gh pr diff <ref>`, or `branch` → `git diff <ref>`. Without this a PR review would re-run the local `git diff HEAD` (usually empty, since the PR branch isn't checked out) and the viewer would render zero hunks. See `captureForSource` in `src/cli/index.ts`.
+- **The hook re-captures the diff (source B) — and must capture the SAME one the agent reviewed.** It never sees `/review`'s arguments, so the agent's payload carries a `source`: `worktree` (default → `git diff HEAD`), `pr` → `gh pr diff <ref>`, or `branch` → `git diff <ref>`. Without this a PR review would re-run the local `git diff HEAD` (usually empty, since the PR branch isn't checked out) and the viewer would render zero hunks. See `captureForSource` in `src/server/session.ts`.
 - It reads files on demand (C), starts the server, opens the browser, and **blocks** until `/api/done` (long timeout, e.g. `345600`).
 - **Phase 1 return:** `{ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "allow" } }` (the review was informational; let the agent proceed).
 - **Later (round-trip):** return `permissionDecision: "deny"` with the human's annotations as `permissionDecisionReason`, so the agent acts on the feedback.

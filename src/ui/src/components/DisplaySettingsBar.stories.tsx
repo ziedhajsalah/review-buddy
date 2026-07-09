@@ -1,8 +1,8 @@
-import { useState } from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { useState } from "react";
 import type { DisplaySettings } from "../../../types/review.ts";
-import { DisplaySettingsBar } from "./DisplaySettingsBar.tsx";
 import { DEFAULT_SETTINGS } from "../stories/fixtures.ts";
+import { DisplaySettingsBar } from "./DisplaySettingsBar.tsx";
 
 const meta = {
   title: "Components/DisplaySettingsBar",
@@ -20,8 +20,7 @@ export const Default: Story = {
   },
   render: function Interactive() {
     const [settings, setSettings] = useState<DisplaySettings>(DEFAULT_SETTINGS);
-    const update = (patch: Partial<DisplaySettings>) =>
-      setSettings((s) => ({ ...s, ...patch }));
+    const update = (patch: Partial<DisplaySettings>) => setSettings((s) => ({ ...s, ...patch }));
     return <DisplaySettingsBar settings={settings} update={update} />;
   },
 };

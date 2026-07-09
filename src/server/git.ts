@@ -3,26 +3,43 @@
  * contents — all read from the local repo in the hook's cwd. Non-mutating:
  * never stages, commits, or resets the user's working tree.
  */
-import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { execFile, execFileSync } from "node:child_process";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
+import { join, sep } from "node:path";
+import { promisify } from "node:util";
 import type { PrMetadata } from "../types/review.ts";
 
 /** git's hash of the empty tree — used to diff a repo with no commits yet. */
 export const EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
 
 const MAX_BUFFER = 1024 * 1024 * 128;
+const execFileAsync = promisify(execFile);
 
-function run(
-  cmd: string,
-  cwd: string,
-  args: string[],
-  allowFail = false,
-): string {
+function run(cmd: string, cwd: string, args: string[], allowFail = false): string {
   try {
     return execFileSync(cmd, args, { cwd, encoding: "utf8", maxBuffer: MAX_BUFFER });
   } catch (err) {
     // `git diff --no-index` exits 1 when files differ — expected, not an error.
+    const stdout = (err as { stdout?: string }).stdout;
+    if (allowFail) return typeof stdout === "string" ? stdout : "";
+    throw err;
+  }
+}
+
+async function runAsync(
+  cmd: string,
+  cwd: string,
+  args: string[],
+  allowFail = false,
+): Promise<string> {
+  try {
+    const { stdout } = await execFileAsync(cmd, args, {
+      cwd,
+      encoding: "utf8",
+      maxBuffer: MAX_BUFFER,
+    });
+    return stdout;
+  } catch (err) {
     const stdout = (err as { stdout?: string }).stdout;
     if (allowFail) return typeof stdout === "string" ? stdout : "";
     throw err;
@@ -34,6 +51,8 @@ function run(
 // special-character filenames survive capture. Do not narrow it to one call.
 const git = (cwd: string, args: string[], allowFail = false) =>
   run("git", cwd, ["--no-pager", "-c", "core.quotePath=false", ...args], allowFail);
+const gitAsync = (cwd: string, args: string[], allowFail = false) =>
+  runAsync("git", cwd, ["--no-pager", "-c", "core.quotePath=false", ...args], allowFail);
 
 /**
  * Guard against argv flag smuggling: `ref` originates in the agent's JSON (and,
@@ -52,7 +71,9 @@ export function assertSafeRef(ref: string): void {
 
 export function assertPrRef(ref: string): void {
   if (!PR_REF_RE.test(ref)) {
-    throw new Error(`Refusing unsafe PR ref (want a number or github PR URL): ${JSON.stringify(ref)}`);
+    throw new Error(
+      `Refusing unsafe PR ref (want a number or github PR URL): ${JSON.stringify(ref)}`,
+    );
   }
 }
 
@@ -72,20 +93,36 @@ export function resolveBase(cwd: string, override?: string): string {
  * Untracked, non-ignored files are folded in via `git diff --no-index` so they
  * appear as new-file diffs without touching the index.
  */
-export function captureDiff(cwd: string, base: string): string {
-  const tracked = git(cwd, ["diff", "--no-color", base]);
+export async function captureDiff(cwd: string, base: string): Promise<string> {
+  const tracked = await gitAsync(cwd, ["diff", "--no-color", base]);
 
   // -z = NUL-terminated raw paths: no C-quoting of special characters, so the
   // exact on-disk name reaches `git diff --no-index` below.
-  const others = git(cwd, ["ls-files", "-z", "--others", "--exclude-standard"])
+  const others = (await gitAsync(cwd, ["ls-files", "-z", "--others", "--exclude-standard"]))
     .split("\0")
     .filter(Boolean);
 
-  let untracked = "";
-  for (const f of others) {
-    untracked += git(cwd, ["diff", "--no-color", "--no-index", "--", "/dev/null", f], true);
+  // Fold untracked files via `git diff --no-index` — one spawn per file (the
+  // command takes exactly two paths, so it can't be batched). Run them
+  // concurrently (bounded) so an atypical repo with many untracked non-ignored
+  // files doesn't stall the blocking hook. Order preserved for a stable diff.
+  const LIMIT = 16;
+  const parts: string[] = new Array(others.length);
+  let next = 0;
+  async function worker() {
+    while (true) {
+      const i = next++;
+      if (i >= others.length) return;
+      parts[i] = await gitAsync(
+        cwd,
+        ["diff", "--no-color", "--no-index", "--", "/dev/null", others[i]!],
+        true,
+      );
+    }
   }
+  await Promise.all(Array.from({ length: Math.min(LIMIT, others.length) }, worker));
 
+  const untracked = parts.join("");
   if (!untracked) return tracked;
   const sep = tracked && !tracked.endsWith("\n") ? "\n" : "";
   return tracked + sep + untracked;
@@ -216,10 +253,27 @@ export function fileContent(
 ): string {
   if (side === "head") {
     // PR mode: the reviewed state is a commit, not the local working tree.
-    if (headRef) return git(cwd, ["show", `${headRef}:${path}`], true);
+    if (headRef) {
+      assertSafeRef(headRef); // consistency with the base side — headRef is API/agent-derived
+      return git(cwd, ["show", `${headRef}:${path}`], true);
+    }
     if (headRef === null) return ""; // PR mode, content unavailable — never leak worktree bytes
     const abs = join(cwd, path);
-    return existsSync(abs) ? readFileSync(abs, "utf8") : "";
+    if (!existsSync(abs)) return "";
+    // abs may be (or pass through) a symlink pointing OUTSIDE the repo. The caller's
+    // lexical isInside() can't catch that, since resolve() doesn't dereference
+    // links. Realpath both sides and confirm containment before we read: a link
+    // that escapes the repo must never be served as repo content.
+    let real: string;
+    let root: string;
+    try {
+      real = realpathSync(abs);
+      root = realpathSync(cwd);
+    } catch {
+      return "";
+    }
+    if (real !== root && !real.startsWith(root + sep)) return "";
+    return readFileSync(real, "utf8");
   }
   const ref = baseRef === EMPTY_TREE ? "" : baseRef;
   if (!ref) return "";

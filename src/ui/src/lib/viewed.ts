@@ -8,6 +8,7 @@
 import { useCallback } from "react";
 import { getReviewToken } from "../session.ts";
 import { usePersistedState } from "./usePersistedState.ts";
+import { viewedSet } from "./viewedSet.ts";
 
 const KEY = `rb.viewed.${getReviewToken() || "notoken"}`;
 
@@ -27,10 +28,7 @@ export function clearViewedFiles() {
 
 export function useViewedFiles(chapterIndex: number) {
   const [entries, setEntries] = usePersistedState<string[]>(KEY, [], "local");
-  const prefix = `${chapterIndex}:`;
-  const viewed = new Set(
-    entries.filter((e) => e.startsWith(prefix)).map((e) => e.slice(prefix.length)),
-  );
+  const viewed = viewedSet(entries, chapterIndex);
 
   const toggle = useCallback(
     (path: string) => {

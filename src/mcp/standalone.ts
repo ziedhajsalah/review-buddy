@@ -16,11 +16,11 @@
  * No flag = off: the handler is the Phase-1 ack for the hook flow.
  */
 import { isAbsolute } from "node:path";
-import type { AgentReview } from "../types/review.ts";
-import type { RunningServer } from "../server/http.ts";
 import { repoToplevel } from "../server/git.ts";
+import type { RunningServer } from "../server/http.ts";
 import { openReviewSession, requestChangesMessage } from "../server/session.ts";
 import { validateAgentReview } from "../server/validate.ts";
+import type { AgentReview } from "../types/review.ts";
 import type { StandaloneMode } from "./mode.ts";
 
 export interface ToolResult {
@@ -43,6 +43,23 @@ let current: RunningServer | undefined;
 export function stopCurrentSession(): void {
   current?.stop();
   current = undefined;
+}
+
+/**
+ * Build an idempotent shutdown that stops the live viewer then exits. The MCP
+ * server wires this to client-disconnect + termination signals so a detached
+ * standalone review can't outlive its client — otherwise a closed stdio pipe
+ * (e.g. an editor reload) would leak the loopback port and a token-gated viewer
+ * of the last diff. `exit` is injected for testability.
+ */
+export function makeShutdown(exit: (code: number) => void = process.exit): () => void {
+  let done = false;
+  return () => {
+    if (done) return;
+    done = true;
+    stopCurrentSession();
+    exit(0);
+  };
 }
 
 /** `value` must be an absolute path inside a git work tree; returns its repo root. */
@@ -101,7 +118,7 @@ export async function handleStandaloneSubmit(
   let server: RunningServer;
   try {
     // Blocking exists to return the verdict, so the verdict UI is forced on.
-    server = openReviewSession(agent, cwd, mode === "blocking" ? { roundtrip: true } : {});
+    server = await openReviewSession(agent, cwd, mode === "blocking" ? { roundtrip: true } : {});
   } catch (e) {
     return err(`Review Buddy could not open the review: ${errMsg(e)}`);
   }
@@ -122,7 +139,9 @@ export async function handleStandaloneSubmit(
   if (current === server) current = undefined;
   server.stop();
   if (result.superseded) {
-    return ok("This review was superseded by a newer submit_review call; no verdict was collected.");
+    return ok(
+      "This review was superseded by a newer submit_review call; no verdict was collected.",
+    );
   }
   if (result.verdict === "request_changes") {
     return ok(requestChangesMessage(result.summary));

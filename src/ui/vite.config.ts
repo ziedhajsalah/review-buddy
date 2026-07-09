@@ -1,8 +1,8 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
+import react from "@vitejs/plugin-react";
+import { defineConfig } from "vite";
 
 /**
  * The built app is served by our own Bun server (src/server/http.ts) from
@@ -18,6 +18,11 @@ export default defineConfig({
     alias: {
       "@": path.resolve(dirname, "./src"),
     },
+  },
+  // Pierre's worker script contains a dynamic import("shiki/wasm") branch;
+  // emit workers as ES modules so Vite can bundle that branch when needed.
+  worker: {
+    format: "es",
   },
   build: {
     outDir: "dist",

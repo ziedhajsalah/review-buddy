@@ -18,7 +18,12 @@ export const WithInput: Story = {
   render: () => (
     <div className="grid w-full max-w-sm gap-1.5">
       <Label htmlFor="email">Email</Label>
-      <input id="email" type="email" placeholder="you@example.com" className="rounded-md border border-border px-2 py-1 text-sm" />
+      <input
+        id="email"
+        type="email"
+        placeholder="you@example.com"
+        className="rounded-md border border-border px-2 py-1 text-sm"
+      />
     </div>
   ),
 };

@@ -106,9 +106,7 @@ describe("resolveReview", () => {
     expect(file.old_path).toBeUndefined();
     expect(file.language).toBe("typescript");
     expect(file.hunks).toHaveLength(1);
-    expect(file.hunks[0]!.header).toBe(
-      "@@ -12,6 +12,9 @@ export function useSport() {",
-    );
+    expect(file.hunks[0]!.header).toBe("@@ -12,6 +12,9 @@ export function useSport() {");
     expect(file.hunks[0]!.lines).toContain("+  return user?.sport ?? sports[0];");
   });
 
@@ -198,6 +196,53 @@ index 1111111..2222222 100644
     expect(review.chapters[0]!.files[0]!.hunks[0]!.old_start).toBe(1);
     expect(review.chapters[1]!.files[0]!.hunks[0]!.old_start).toBe(10);
     expect(warnings.some((w) => w.includes("normalized to"))).toBe(true);
+  });
+});
+
+describe("resolveReview — within-chapter dedup", () => {
+  const TWO_HUNK_DIFF = `diff --git a/multi.ts b/multi.ts
+index 1111111..2222222 100644
+--- a/multi.ts
++++ b/multi.ts
+@@ -1,3 +1,4 @@
+ a
+-b
++b1
+ c
+@@ -10,3 +11,4 @@
+ x
+-y
++y1
+ z
+`;
+
+  test("same path listed twice in one chapter merges into a single file", () => {
+    const agent: AgentReview = {
+      prologue: AGENT.prologue,
+      chapters: [
+        {
+          index: 1,
+          title: "Both hunks, listed twice",
+          risk: "Low",
+          risk_reason: "test",
+          description: "same path appears twice",
+          files: [
+            { path: "multi.ts", change_type: "modified", hunks: [{ old_start: 1, new_start: 1 }] },
+            {
+              path: "multi.ts",
+              change_type: "modified",
+              hunks: [{ old_start: 10, new_start: 10 }],
+            },
+          ],
+        },
+      ],
+    };
+    const { review } = resolveReview(agent, TWO_HUNK_DIFF, META, PR);
+    const ch1 = review.chapters[0]!;
+    expect(ch1.fileCount).toBe(1);
+    expect(ch1.files.filter((f) => f.path === "multi.ts")).toHaveLength(1);
+    expect(ch1.files[0]!.hunks).toHaveLength(2);
+    expect(ch1.files[0]!.hunks.map((h) => h.old_start)).toEqual([1, 10]);
   });
 });
 

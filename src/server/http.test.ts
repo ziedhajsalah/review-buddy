@@ -5,8 +5,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AgentReview, PrMetadata, ReviewMeta } from "../types/review.ts";
 import { captureDiff, capturePr, resolveBase } from "./git.ts";
+import { type RunningServer, startServer } from "./http.ts";
 import { resolveReview } from "./resolve.ts";
-import { startServer, type RunningServer } from "./http.ts";
 
 let dir: string;
 let server: RunningServer;
@@ -19,7 +19,7 @@ const META: ReviewMeta = {
   promptVersion: "1",
 };
 
-beforeAll(() => {
+beforeAll(async () => {
   dir = mkdtempSync(join(tmpdir(), "rb-http-"));
   const git = (...args: string[]) => execFileSync("git", args, { cwd: dir, encoding: "utf8" });
   git("init", "-q");
@@ -55,7 +55,7 @@ beforeAll(() => {
     ],
   };
   const pr: PrMetadata = capturePr(dir, base);
-  const { review } = resolveReview(agent, captureDiff(dir, base), META, pr);
+  const { review } = resolveReview(agent, await captureDiff(dir, base), META, pr);
   server = startServer({ review, cwd: dir, baseRef: base });
 });
 
@@ -101,7 +101,7 @@ describe("HTTP server", () => {
       ],
     };
     const pr = capturePr(dir, base);
-    const { review } = resolveReview(agent, captureDiff(dir, base), META, pr);
+    const { review } = resolveReview(agent, await captureDiff(dir, base), META, pr);
     const s = startServer({ review, cwd: dir, baseRef: base, roundtrip: true });
     try {
       const res = await fetch(`http://127.0.0.1:${s.port}/api/config`, {
@@ -156,13 +156,12 @@ describe("HTTP server", () => {
       ],
     };
     const pr: PrMetadata = capturePr(dir, base);
-    const { review } = resolveReview(agent, captureDiff(dir, base), META, pr);
+    const { review } = resolveReview(agent, await captureDiff(dir, base), META, pr);
     const s = startServer({ review, cwd: dir, baseRef: base, headRef: null });
     try {
-      const res = await fetch(
-        `http://127.0.0.1:${s.port}/api/file-content?path=app.ts&side=head`,
-        { headers: { "x-review-buddy-token": s.token } },
-      );
+      const res = await fetch(`http://127.0.0.1:${s.port}/api/file-content?path=app.ts&side=head`, {
+        headers: { "x-review-buddy-token": s.token },
+      });
       const body = await res.json();
       expect(body.content).toBe(""); // PR mode, unavailable — NOT the worktree "const b = 22;"
     } finally {
@@ -176,9 +175,7 @@ describe("HTTP server", () => {
     );
     expect(traversal.status).toBe(403); // not in the review's file allowlist
 
-    const absolute = await authed(
-      `api/file-content?path=${encodeURIComponent("/etc/passwd")}`,
-    );
+    const absolute = await authed(`api/file-content?path=${encodeURIComponent("/etc/passwd")}`);
     expect(absolute.status).toBe(403);
   });
 
@@ -192,9 +189,16 @@ describe("HTTP server", () => {
     // execFileSync would block the event loop the in-process server runs on,
     // deadlocking against its own request.
     const proc = Bun.spawn([
-      "curl", "-s", "-o", "/dev/null", "-w", "%{http_code}",
-      "-H", "Host: evil.com",
-      "-H", `x-review-buddy-token: ${server.token}`,
+      "curl",
+      "-s",
+      "-o",
+      "/dev/null",
+      "-w",
+      "%{http_code}",
+      "-H",
+      "Host: evil.com",
+      "-H",
+      `x-review-buddy-token: ${server.token}`,
       apiUrl("api/review"),
     ]);
     const code = (await new Response(proc.stdout).text()).trim();
@@ -203,9 +207,12 @@ describe("HTTP server", () => {
   });
 
   test("GET / serves the placeholder viewer (no token needed for the shell)", async () => {
-    const html = await (await fetch(server.url)).text();
+    const res = await fetch(server.url);
+    const html = await res.text();
     expect(html).toContain("Review Buddy");
     expect(html).toContain("/api/review");
+    expect(res.headers.get("content-security-policy")).toContain("default-src 'self'");
+    expect(res.headers.get("x-content-type-options")).toBe("nosniff");
   });
 
   test("POST /api/done unblocks the hook", async () => {
@@ -221,7 +228,7 @@ describe("HTTP server", () => {
     expect(done.verdict).toBe("approve");
   });
 
-  function startUiServer(uiDir: string): RunningServer {
+  test("POST /api/done rejects an oversized body (content-length guard)", async () => {
     const agent: AgentReview = {
       prologue: {
         why: "w",
@@ -244,7 +251,61 @@ describe("HTTP server", () => {
       ],
     };
     const pr: PrMetadata = capturePr(dir, base);
-    const { review } = resolveReview(agent, captureDiff(dir, base), META, pr);
+    const { review } = resolveReview(agent, await captureDiff(dir, base), META, pr);
+    const s = startServer({ review, cwd: dir, baseRef: base });
+    try {
+      // fetch overwrites Content-Length from the real body — curl can forge it.
+      const proc = Bun.spawn([
+        "curl",
+        "-s",
+        "-o",
+        "/dev/null",
+        "-w",
+        "%{http_code}",
+        "-X",
+        "POST",
+        "-H",
+        "content-type: application/json",
+        "-H",
+        `content-length: ${256 * 1024 + 1}`,
+        "-H",
+        `x-review-buddy-token: ${s.token}`,
+        "-d",
+        "{}",
+        `http://127.0.0.1:${s.port}/api/done`,
+      ]);
+      const code = (await new Response(proc.stdout).text()).trim();
+      await proc.exited;
+      expect(code).toBe("413");
+    } finally {
+      s.stop();
+    }
+  });
+
+  async function startUiServer(uiDir: string): Promise<RunningServer> {
+    const agent: AgentReview = {
+      prologue: {
+        why: "w",
+        what: "x",
+        key_changes: [
+          { headline: "h1", detail: "d1" },
+          { headline: "h2", detail: "d2" },
+        ],
+        review_focus: { summary: "s", file: "app.ts" },
+      },
+      chapters: [
+        {
+          index: 1,
+          title: "Tweak b",
+          risk: "Low",
+          risk_reason: "trivial",
+          description: "changes b",
+          files: [{ path: "app.ts", change_type: "modified" }],
+        },
+      ],
+    };
+    const pr: PrMetadata = capturePr(dir, base);
+    const { review } = resolveReview(agent, await captureDiff(dir, base), META, pr);
     return startServer({ review, cwd: dir, baseRef: base, uiDir });
   }
 
@@ -254,14 +315,19 @@ describe("HTTP server", () => {
     mkdirSync(join(uiDir, "assets"), { recursive: true });
     writeFileSync(join(uiDir, "index.html"), "<html>UI</html>");
     writeFileSync(join(uiDir, "assets", "app.js"), "console.log('app')");
-    const s = startUiServer(uiDir);
+    const s = await startUiServer(uiDir);
     try {
-      const index = await (await fetch(`http://127.0.0.1:${s.port}/`)).text();
+      const indexRes = await fetch(`http://127.0.0.1:${s.port}/`);
+      const index = await indexRes.text();
       expect(index).toContain("UI");
+      expect(indexRes.headers.get("content-security-policy")).toContain("default-src 'self'");
+      expect(indexRes.headers.get("x-content-type-options")).toBe("nosniff");
 
       const asset = await fetch(`http://127.0.0.1:${s.port}/assets/app.js`);
       expect(asset.status).toBe(200);
       expect(await asset.text()).toContain("console.log('app')");
+      expect(asset.headers.get("content-security-policy")).toContain("default-src 'self'");
+      expect(asset.headers.get("x-content-type-options")).toBe("nosniff");
     } finally {
       s.stop();
       rmSync(parent, { recursive: true, force: true });
@@ -273,7 +339,7 @@ describe("HTTP server", () => {
     const uiDir = join(parent, "ui");
     mkdirSync(uiDir, { recursive: true });
     writeFileSync(join(uiDir, "index.html"), "<html>UI</html>");
-    const s = startUiServer(uiDir);
+    const s = await startUiServer(uiDir);
     try {
       const res = await fetch(`http://127.0.0.1:${s.port}/nonexistent`);
       expect(res.status).toBe(200);
@@ -290,13 +356,10 @@ describe("HTTP server", () => {
     mkdirSync(uiDir, { recursive: true });
     writeFileSync(join(uiDir, "index.html"), "<html>UI</html>");
     writeFileSync(join(parent, "secret.txt"), "TOPSECRET");
-    const s = startUiServer(uiDir);
+    const s = await startUiServer(uiDir);
     try {
       const curlBody = async (path: string) => {
-        const proc = Bun.spawn([
-          "curl", "-s", "--path-as-is",
-          `http://127.0.0.1:${s.port}${path}`,
-        ]);
+        const proc = Bun.spawn(["curl", "-s", "--path-as-is", `http://127.0.0.1:${s.port}${path}`]);
         const body = await new Response(proc.stdout).text();
         await proc.exited;
         return body;
@@ -348,12 +411,18 @@ describe("HTTP server", () => {
       ],
     };
     const pr: PrMetadata = capturePr(dir, base);
-    const { review } = resolveReview(agent, captureDiff(dir, base), META, pr);
+    const { review } = resolveReview(agent, await captureDiff(dir, base), META, pr);
     const s = startServer({ review, cwd: dir, baseRef: base, uiDir });
     try {
       const proc = Bun.spawn([
-        "curl", "-s", "-o", "/dev/null", "-w", "%{http_code}",
-        "-H", `x-review-buddy-token: ${s.token}`,
+        "curl",
+        "-s",
+        "-o",
+        "/dev/null",
+        "-w",
+        "%{http_code}",
+        "-H",
+        `x-review-buddy-token: ${s.token}`,
         `http://127.0.0.1:${s.port}/%`,
       ]);
       const code = (await new Response(proc.stdout).text()).trim();

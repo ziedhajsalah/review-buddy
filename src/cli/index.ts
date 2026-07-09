@@ -14,10 +14,10 @@
  *                          the UI without going through the agent/hook.
  */
 import { readFileSync } from "node:fs";
-import type { AgentReview } from "../types/review.ts";
 import type { DoneResult } from "../server/http.ts";
 import { openReviewSession, requestChangesMessage } from "../server/session.ts";
 import { validateAgentReview } from "../server/validate.ts";
+import type { AgentReview } from "../types/review.ts";
 
 interface HookEvent {
   tool_name?: string;
@@ -28,13 +28,13 @@ interface HookEvent {
 /** Print a PreToolUse permission decision and exit. */
 function respond(permissionDecision: "allow" | "deny", reason: string): never {
   process.stdout.write(
-    JSON.stringify({
+    `${JSON.stringify({
       hookSpecificOutput: {
         hookEventName: "PreToolUse",
         permissionDecision,
         permissionDecisionReason: reason,
       },
-    }) + "\n",
+    })}\n`,
   );
   process.exit(0);
 }
@@ -50,7 +50,7 @@ function deny(reason: string): never {
 
 /** Open a session (capture/resolve/serve/browser) and block until Done. */
 async function serveAndBlock(agent: AgentReview, cwd: string): Promise<DoneResult> {
-  const server = openReviewSession(agent, cwd);
+  const server = await openReviewSession(agent, cwd);
   const result = await server.done;
   server.stop();
   return result;

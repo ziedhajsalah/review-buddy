@@ -1,11 +1,21 @@
 import { expect, spyOn, test } from "bun:test";
-import { execFileSync } from "node:child_process";
 import * as childProcess from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { makeTempRepo } from "../test-helpers.ts";
 import { parseDiff } from "./diff.ts";
-import { assertPrRef, assertSafeRef, captureDiff, capturePr, capturePrDiff, ensureCommit, fileContent, resolveBase } from "./git.ts";
+import {
+  assertPrRef,
+  assertSafeRef,
+  captureDiff,
+  capturePr,
+  capturePrDiff,
+  ensureCommit,
+  fileContent,
+  resolveBase,
+} from "./git.ts";
 
 test("assertSafeRef rejects flag-smuggling refs, accepts real refs", () => {
   expect(() => assertSafeRef("-O/tmp/x")).toThrow();
@@ -24,6 +34,12 @@ test("fileContent rejects an unsafe base ref before git runs", () => {
   expect(() => fileContent(".", "f", "base", "-Oevil")).toThrow();
 });
 
+test("fileContent (head) rejects a ref that smells like a flag", () => {
+  const repo = makeTempRepo("rb-headref-");
+  expect(() => fileContent(repo, "app.ts", "head", "HEAD", "-evil-flag")).toThrow("unsafe");
+  rmSync(repo, { recursive: true, force: true });
+});
+
 test("assertPrRef accepts a number or github PR URL, rejects the rest", () => {
   expect(() => assertPrRef("42")).not.toThrow();
   expect(() => assertPrRef("https://github.com/owner/repo/pull/7")).not.toThrow();
@@ -37,7 +53,7 @@ test("capturePrDiff refuses an unsafe ref before shelling out to gh", () => {
   expect(() => capturePrDiff(process.cwd(), "--upload-pack=x")).toThrow();
 });
 
-test("captureDiff includes untracked files with special-character names", () => {
+test("captureDiff includes untracked files with special-character names", async () => {
   const dir = mkdtempSync(join(tmpdir(), "rb-git-"));
   try {
     const git = (...args: string[]) => execFileSync("git", args, { cwd: dir, encoding: "utf8" });
@@ -53,12 +69,45 @@ test("captureDiff includes untracked files with special-character names", () => 
     writeFileSync(join(dir, "with space.ts"), "space\n");
     writeFileSync(join(dir, "plain.ts"), "plain\n");
 
-    const diff = captureDiff(dir, "HEAD");
-    const files = parseDiff(diff).map((f) => f.path).sort();
+    const diff = await captureDiff(dir, "HEAD");
+    const files = parseDiff(diff)
+      .map((f) => f.path)
+      .sort();
     expect(files).toEqual(["café.ts", "plain.ts", "with space.ts"]);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test("captureDiff folds in multiple untracked files (concurrent, none dropped)", async () => {
+  const repo = makeTempRepo("rb-untracked-");
+  writeFileSync(join(repo, "u1.txt"), "one\n");
+  writeFileSync(join(repo, "u2.txt"), "two\n");
+  const diff = await captureDiff(repo, "HEAD");
+  expect(diff).toContain("+++ b/u1.txt");
+  expect(diff).toContain("+++ b/u2.txt");
+  expect(diff).toContain("+one");
+  expect(diff).toContain("+two");
+  rmSync(repo, { recursive: true, force: true });
+});
+
+test("fileContent (worktree head) refuses a symlink escaping the repo", () => {
+  const repo = makeTempRepo("rb-symlink-");
+  const outside = mkdtempSync(join(tmpdir(), "rb-outside-"));
+  const secret = join(outside, "secret.txt");
+  writeFileSync(secret, "SENSITIVE");
+  symlinkSync(secret, join(repo, "leak.txt"));
+  const out = fileContent(repo, "leak.txt", "head", "HEAD", undefined);
+  expect(out).toBe(""); // never the secret's bytes
+  rmSync(outside, { recursive: true, force: true });
+  rmSync(repo, { recursive: true, force: true });
+});
+
+test("fileContent (worktree head) still reads a normal in-repo file", () => {
+  const repo = makeTempRepo("rb-normal-");
+  const out = fileContent(repo, "app.ts", "head", "HEAD", undefined);
+  expect(out).toContain("let z = 3;");
+  rmSync(repo, { recursive: true, force: true });
 });
 
 test("fileContent head side reads a git object when a headRef SHA is given", () => {
@@ -124,14 +173,16 @@ test.serial("capturePr parses gh pr view JSON when available", () => {
     // Bun's execFileSync ignores runtime PATH mutations (oven-sh/bun#29237), so a
     // fake `gh` on PATH is not picked up. Intercept the gh call instead.
     const origExec = childProcess.execFileSync;
-    const ghSpy = spyOn(childProcess, "execFileSync").mockImplementation(
-      ((cmd: string, args?: readonly string[], opts?: Parameters<typeof origExec>[2]) => {
-        if (cmd === "gh") {
-          return '{"title":"T","body":"B","author":{"login":"alice"},"baseRefName":"main","headRefName":"feat"}\n';
-        }
-        return origExec(cmd, args ?? [], opts);
-      }) as typeof origExec,
-    );
+    const ghSpy = spyOn(childProcess, "execFileSync").mockImplementation(((
+      cmd: string,
+      args?: readonly string[],
+      opts?: Parameters<typeof origExec>[2],
+    ) => {
+      if (cmd === "gh") {
+        return '{"title":"T","body":"B","author":{"login":"alice"},"baseRefName":"main","headRefName":"feat"}\n';
+      }
+      return origExec(cmd, args ?? [], opts);
+    }) as typeof origExec);
 
     const pr = capturePr(dir, "fallback-base");
     expect(pr.title).toBe("T");
@@ -163,12 +214,14 @@ test.serial("capturePr falls back to local git when gh yields no JSON", () => {
     // subject as title, `git config user.name` as author). Intercept gh the same
     // way as the happy path; delegate real git calls.
     const origExec = childProcess.execFileSync;
-    const ghSpy = spyOn(childProcess, "execFileSync").mockImplementation(
-      ((cmd: string, args?: readonly string[], opts?: Parameters<typeof origExec>[2]) => {
-        if (cmd === "gh") return ""; // no JSON → fallback
-        return origExec(cmd, args ?? [], opts);
-      }) as typeof origExec,
-    );
+    const ghSpy = spyOn(childProcess, "execFileSync").mockImplementation(((
+      cmd: string,
+      args?: readonly string[],
+      opts?: Parameters<typeof origExec>[2],
+    ) => {
+      if (cmd === "gh") return ""; // no JSON → fallback
+      return origExec(cmd, args ?? [], opts);
+    }) as typeof origExec);
 
     const pr = capturePr(dir, "fallback-base");
     expect(pr.title).toBe("my subject");
