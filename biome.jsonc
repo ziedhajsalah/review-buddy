@@ -9,6 +9,7 @@
     "ignoreUnknown": false,
     "includes": [
       "**",
+      "!!docs/**/*.html",
       "!!**/node_modules",
       "!!src/ui/dist",
       "!!storybook-static",
