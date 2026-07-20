@@ -17,7 +17,7 @@ The agent provides **judgment and structure**; the actual diff bytes come from g
 
 ## Status
 
-**v0.3.0 — Phase 1 complete** (one-way viewer), installed with zero build steps (the viewer ships prebuilt). What's in:
+**v0.3.1 — Phase 1 complete** (one-way viewer), installed with zero build steps (the viewer ships prebuilt). What's in:
 
 - **Backend** — `submit_review` MCP tool, `/review` skill, and a blocking `PreToolUse` hook that captures the diff, resolves chapters (unclaimed changes bucketed into "Unsorted changes"), recomputes stats, and serves a hardened local app (loopback-only bind, Host-header validation, per-server token, path-traversal allowlist, symlink-safe file reads, payload caps, self-only CSP).
 - **Viewer** — Vite + React 19 + Tailwind v4 on [`@pierre/diffs`](https://www.npmjs.com/package/@pierre/diffs): Prologue/Description overview, risk-rated chapter cards, split-pane chapter review, unified/split diffs with word-level + off-thread syntax highlighting (worker pool), per-file controls, cookie-persisted display prefs. Agent prose and the PR description render as **markdown** (`react-markdown` + GFM, no raw HTML).
