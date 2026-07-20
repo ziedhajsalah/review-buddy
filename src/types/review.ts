@@ -184,7 +184,7 @@ export interface DisplaySettings {
   layout: DiffLayout;
   theme: "auto" | "light" | "dark";
   changeIndicator: "classic" | "bars" | "none";
-  granularity: "line" | "word";
+  granularity: "line" | "word" | "char";
   wrap: boolean;
   lineNumbers: boolean;
   backgrounds: boolean;

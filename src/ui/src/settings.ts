@@ -3,8 +3,9 @@
  * to a host-scoped cookie and mapped onto @pierre/diffs' FileDiffOptions.
  */
 
-import type { FileDiffOptions } from "@pierre/diffs";
-import { useCallback } from "react";
+import type { FileDiffOptions, LineDiffTypes } from "@pierre/diffs";
+import { useWorkerPool } from "@pierre/diffs/react";
+import { useCallback, useEffect } from "react";
 import type { DisplaySettings } from "../../types/review.ts";
 import { usePersistedState } from "./lib/usePersistedState.ts";
 
@@ -20,8 +21,23 @@ export const DEFAULT_SETTINGS: DisplaySettings = {
   backgrounds: true,
 };
 
+export function granularityToLineDiffType(
+  granularity: DisplaySettings["granularity"],
+): LineDiffTypes {
+  return granularity === "line" ? "none" : granularity;
+}
+
 export function useDisplaySettings() {
   const [settings, setSettings] = usePersistedState(KEY, DEFAULT_SETTINGS, "cookie");
+  const pool = useWorkerPool();
+
+  useEffect(() => {
+    void pool
+      ?.setRenderOptions({
+        lineDiffType: granularityToLineDiffType(settings.granularity),
+      })
+      ?.catch(() => {});
+  }, [pool, settings.granularity]);
 
   const update = useCallback(
     (patch: Partial<DisplaySettings>) => setSettings((s) => ({ ...s, ...patch })),
@@ -39,7 +55,7 @@ export function toDiffOptions(s: DisplaySettings): FileDiffOptions<undefined> {
   return {
     diffStyle: s.layout,
     diffIndicators: s.changeIndicator,
-    lineDiffType: s.granularity === "word" ? "word" : "none",
+    lineDiffType: granularityToLineDiffType(s.granularity),
     overflow: s.wrap ? "wrap" : "scroll",
     disableLineNumbers: !s.lineNumbers,
     disableBackground: !s.backgrounds,

@@ -1,6 +1,7 @@
 /// <reference types="bun-types" />
 import { afterEach, expect, mock, test } from "bun:test";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import type { ComponentProps } from "react";
 import type { ResolvedFile } from "../../../types/review.ts";
 import { DEFAULT_SETTINGS } from "../settings.ts";
 
@@ -35,32 +36,86 @@ const modified: ResolvedFile = {
   ],
 };
 
-test("expand surfaces an error notice when file-content fetch rejects", async () => {
-  fetchImpl = async () => {
-    throw new Error("boom");
-  };
-  render(
+function renderCard(overrides: Partial<ComponentProps<typeof FileDiffCard>> = {}) {
+  return render(
     <FileDiffCard
       file={modified}
       settings={DEFAULT_SETTINGS}
       viewed={false}
-      onToggleViewed={() => {}}
+      collapsed={false}
+      onViewedChange={() => {}}
+      onSetCollapsed={() => {}}
+      {...overrides}
     />,
   );
+}
+
+test("expand surfaces an error notice when file-content fetch rejects", async () => {
+  fetchImpl = async () => {
+    throw new Error("boom");
+  };
+  renderCard();
   fireEvent.click(screen.getByText("expand"));
   await waitFor(() => expect(screen.getByText(/Full file unavailable/)).toBeDefined());
 });
 
 test("expand shows the unavailable notice when required content is empty", async () => {
   fetchImpl = async () => ({ content: "" });
-  render(
-    <FileDiffCard
-      file={modified}
-      settings={DEFAULT_SETTINGS}
-      viewed={false}
-      onToggleViewed={() => {}}
-    />,
-  );
+  renderCard();
   fireEvent.click(screen.getByText("expand"));
   await waitFor(() => expect(screen.getByText(/Full file unavailable/)).toBeDefined());
+});
+
+test("checking viewed calls onViewedChange(path, true)", () => {
+  const onViewedChange = mock(() => {});
+  renderCard({ onViewedChange });
+  fireEvent.click(screen.getByLabelText("viewed"));
+  expect(onViewedChange).toHaveBeenCalledWith("app.ts", true);
+});
+
+test("unchecking viewed calls onViewedChange(path, false)", () => {
+  const onViewedChange = mock(() => {});
+  renderCard({ viewed: true, collapsed: true, onViewedChange });
+  fireEvent.click(screen.getByLabelText("viewed"));
+  expect(onViewedChange).toHaveBeenCalledWith("app.ts", false);
+});
+
+test("when collapsed, the diff body is hidden and the caret expands", () => {
+  const onSetCollapsed = mock(() => {});
+  const binary: ResolvedFile = { ...modified, binary: true, hunks: [] };
+  renderCard({ file: binary, collapsed: true, onSetCollapsed });
+  expect(screen.queryByText(/Binary file/)).toBeNull();
+  fireEvent.click(screen.getByLabelText("Expand file"));
+  expect(onSetCollapsed).toHaveBeenCalledWith("app.ts", false);
+});
+
+test("collapsing after expand keeps the body mounted but hidden", () => {
+  const binary: ResolvedFile = { ...modified, binary: true, hunks: [] };
+  const { rerender } = renderCard({ file: binary, collapsed: false });
+  const body = screen.getByText(/Binary file/);
+  expect(body.closest("[hidden]")).toBeNull();
+
+  rerender(
+    <FileDiffCard
+      file={binary}
+      settings={DEFAULT_SETTINGS}
+      viewed={false}
+      collapsed={true}
+      onViewedChange={() => {}}
+      onSetCollapsed={() => {}}
+    />,
+  );
+  expect(screen.getByText(/Binary file/).closest("[hidden]")).not.toBeNull();
+
+  rerender(
+    <FileDiffCard
+      file={binary}
+      settings={DEFAULT_SETTINGS}
+      viewed={false}
+      collapsed={false}
+      onViewedChange={() => {}}
+      onSetCollapsed={() => {}}
+    />,
+  );
+  expect(screen.getByText(/Binary file/).closest("[hidden]")).toBeNull();
 });

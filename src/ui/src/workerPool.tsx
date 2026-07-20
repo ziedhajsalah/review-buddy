@@ -5,6 +5,7 @@ import { WorkerPoolContextProvider } from "@pierre/diffs/react";
 // @ts-expect-error Vite ?worker virtual module (no ambient types in this package)
 import DiffsWorker from "@pierre/diffs/worker/worker.js?worker";
 import type { ReactNode } from "react";
+import { DEFAULT_SETTINGS, granularityToLineDiffType } from "./settings.ts";
 
 const poolOptions: WorkerPoolOptions = {
   poolSize: Math.min(Math.max(1, (globalThis.navigator?.hardwareConcurrency ?? 2) - 1), 3),
@@ -14,6 +15,7 @@ const poolOptions: WorkerPoolOptions = {
 
 const highlighterOptions: WorkerInitializationRenderOptions = {
   preferredHighlighter: "shiki-js",
+  lineDiffType: granularityToLineDiffType(DEFAULT_SETTINGS.granularity),
   langs: [
     "typescript",
     "tsx",

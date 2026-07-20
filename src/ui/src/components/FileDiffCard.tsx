@@ -1,6 +1,6 @@
 import type { FileDiffMetadata } from "@pierre/diffs";
 import { FileDiff, PatchDiff } from "@pierre/diffs/react";
-import { memo, useId, useMemo, useState } from "react";
+import { memo, useId, useMemo, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -24,27 +24,35 @@ const CHANGE_LABEL: Record<ResolvedFile["change_type"], string> = {
 // Memoized on purpose: ChapterReview mounts one card per file and re-renders on
 // every filter keystroke / viewed toggle. Without memo, one keystroke re-renders
 // every card (and re-queues worker highlights). memo only works while its props
-// stay referentially stable — in particular `onToggleViewed` must be passed as a
-// stable callback (it takes the path so the parent can hand over `toggleViewed`
-// directly rather than allocating a per-render arrow). Do not re-wrap it in a closure.
+// stay referentially stable — in particular `onViewedChange` and `onSetCollapsed`
+// must be passed as stable callbacks (they take the path so the parent can hand
+// over `handleViewedChange` / `setCollapsed` directly rather than allocating a
+// per-render arrow). Do not re-wrap them in closures.
 export const FileDiffCard = memo(function FileDiffCard({
   file,
   settings,
   viewed,
-  onToggleViewed,
+  collapsed,
+  onViewedChange,
+  onSetCollapsed,
 }: {
   file: ResolvedFile;
   settings: DisplaySettings;
   viewed: boolean;
-  onToggleViewed: (path: string) => void;
+  collapsed: boolean;
+  onViewedChange: (path: string, checked: boolean) => void;
+  onSetCollapsed: (path: string, value: boolean) => void;
 }) {
-  const [collapsed, setCollapsed] = useState(false);
   const [copied, setCopied] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [expandedDiff, setExpandedDiff] = useState<FileDiffMetadata | null>(null);
   const [expandLoading, setExpandLoading] = useState(false);
   const [expandNotice, setExpandNotice] = useState<string | null>(null);
   const viewedId = useId();
+  // Once mounted, hide — don't unmount — on collapse (unmount re-queues worker
+  // highlights on re-expand). Initial-collapsed cards stay unmounted until first expand.
+  const bodyMounted = useRef(!collapsed);
+  if (!collapsed) bodyMounted.current = true;
 
   const patch = useMemo(() => fileToPatch(file), [file]);
   const options = useMemo(() => toDiffOptions(settings), [settings]);
@@ -105,7 +113,7 @@ export const FileDiffCard = memo(function FileDiffCard({
           <Button
             variant="ghost"
             size="icon-xs"
-            onClick={() => setCollapsed((c) => !c)}
+            onClick={() => onSetCollapsed(file.path, !collapsed)}
             className="shrink-0 font-mono text-xs text-muted-foreground"
             title={collapsed ? "Expand" : "Collapse"}
             aria-label={collapsed ? "Expand file" : "Collapse file"}
@@ -143,7 +151,7 @@ export const FileDiffCard = memo(function FileDiffCard({
               id={viewedId}
               size="sm"
               checked={viewed}
-              onCheckedChange={() => onToggleViewed(file.path)}
+              onCheckedChange={(checked) => onViewedChange(file.path, checked)}
             />
             <Label
               htmlFor={viewedId}
@@ -155,25 +163,28 @@ export const FileDiffCard = memo(function FileDiffCard({
         </div>
       </header>
 
-      {!collapsed &&
-        (file.binary ? (
-          <CardContent className="p-4 text-sm text-muted-foreground">
-            Binary file — content not shown.
-          </CardContent>
-        ) : (
-          <>
-            {expandNotice && (
-              <p className="px-3 py-2 text-xs text-muted-foreground">{expandNotice}</p>
-            )}
-            <div className="overflow-x-auto text-[13px]">
-              {expanded && expandedDiff ? (
-                <FileDiff fileDiff={expandedDiff} options={expandedOptions} />
-              ) : (
-                <PatchDiff patch={patch} options={options} />
+      {bodyMounted.current && (
+        <div hidden={collapsed}>
+          {file.binary ? (
+            <CardContent className="p-4 text-sm text-muted-foreground">
+              Binary file — content not shown.
+            </CardContent>
+          ) : (
+            <>
+              {expandNotice && (
+                <p className="px-3 py-2 text-xs text-muted-foreground">{expandNotice}</p>
               )}
-            </div>
-          </>
-        ))}
+              <div className="overflow-x-auto text-[13px]">
+                {expanded && expandedDiff ? (
+                  <FileDiff fileDiff={expandedDiff} options={expandedOptions} />
+                ) : (
+                  <PatchDiff patch={patch} options={options} />
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      )}
     </Card>
   );
 });
