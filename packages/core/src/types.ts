@@ -304,6 +304,21 @@ export interface ReviewComment {
 
 export type ReviewVerdict = "approve" | "request_changes";
 
+/** What the reviewer decided about one finding. */
+export type FindingDecision = "fix" | "dismiss";
+
+/**
+ * The reviewer's answer to a finding, by its `ResolvedFinding.id`. Only the
+ * decision and a reason travel: the finding's own text came from the agent,
+ * and the tool does not send it back.
+ */
+export interface FindingAnswer {
+  id: string;
+  decision: FindingDecision;
+  /** Why it was dismissed — the agent must not raise it again. */
+  reason?: string;
+}
+
 /** What the viewer sends when the reviewer finishes. Empty = Done with no round-trip. */
 export interface DoneResult {
   verdict?: ReviewVerdict;
@@ -311,7 +326,18 @@ export interface DoneResult {
   summary?: string;
   /** Line comments, sent with the verdict when round-trip is on. */
   comments?: ReviewComment[];
+  /** Answers to the findings the review carried (`ResolvedReview.findings`). */
+  findings?: FindingAnswer[];
 }
+
+/**
+ * An answer joined back onto the finding it answers — what the agent is told.
+ * The join happens where the resolved review is known (the server), so the
+ * location and title are the tool's own, not the browser's.
+ */
+export interface AnsweredFinding
+  extends Pick<ResolvedFinding, "path" | "line" | "start_line" | "side" | "severity" | "title">,
+    Pick<FindingAnswer, "decision" | "reason"> {}
 
 /* ------------------------------------------------------------------ */
 /* Client-only view state (source D — cookies/localStorage)            */
