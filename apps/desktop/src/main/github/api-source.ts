@@ -17,6 +17,8 @@
  * Dependencies are passed in (no Electron import), so this is tested with bun
  * against recorded responses (fixtures/).
  */
+
+import { checksFromRest, ciSummary } from "@review-buddy/core/checks";
 import { type ParsedFile, parseDiff } from "@review-buddy/core/diff";
 import type { ReviewDataSource } from "@review-buddy/core/source";
 import type { PrMetadata } from "@review-buddy/core/types";
@@ -244,12 +246,35 @@ export async function openGitHubPr(prRef: PrRef, deps: OpenDeps): Promise<GitHub
     return diffLoad;
   };
 
+  // 4. CI of the head commit, read on the first `pr()` (and kept). Fail-open:
+  // a token without the checks permission, or GitHub down, only hides the row.
+  let prLoad: Promise<PrMetadata> | null = null;
+  const loadPr = () => {
+    prLoad ??= (async () => {
+      const json = async (url: string): Promise<unknown> => {
+        try {
+          const res = await get(url);
+          return res.ok ? await res.json() : undefined;
+        } catch {
+          return undefined;
+        }
+      };
+      const [runs, status] = await Promise.all([
+        json(`${repoUrl}/commits/${headSha}/check-runs?per_page=100`),
+        json(`${repoUrl}/commits/${headSha}/status?per_page=100`),
+      ]);
+      const checks = checksFromRest(runs, status);
+      return checks ? { ...pr, checks, ciStatus: ciSummary(checks) } : pr;
+    })();
+    return prLoad;
+  };
+
   return {
     ref,
     headSha,
     baseSha,
     diff: async () => (await loadDiff()).raw,
-    pr: async () => pr,
+    pr: loadPr,
     files: async () =>
       [...(await loadDiff()).files.values()].map(({ path, oldPath, changeType, binary }) =>
         oldPath === undefined

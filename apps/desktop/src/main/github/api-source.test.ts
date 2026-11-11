@@ -89,6 +89,49 @@ describe("openGitHubPr (recorded responses)", () => {
     expect(source.baseSha).toBe(BASE);
   });
 
+  test("CI of the head commit: check runs and statuses, read once, failed first", async () => {
+    const gh = fakeGitHub({
+      [`${JSON_ACCEPT} ${API}/commits/${HEAD}/check-runs?per_page=100`]: () =>
+        Response.json({
+          check_runs: [
+            {
+              name: "verify",
+              status: "completed",
+              conclusion: "success",
+              html_url: "https://github.com/o/r/runs/1",
+            },
+            { name: "e2e", status: "completed", conclusion: "failure" },
+          ],
+        }),
+      [`${JSON_ACCEPT} ${API}/commits/${HEAD}/status?per_page=100`]: () =>
+        Response.json({ statuses: [{ context: "deploy", state: "pending" }] }),
+    });
+    const source = await open(gh);
+    const pr = await source.pr();
+    expect(pr.checks).toEqual([
+      { name: "e2e", status: "failed" },
+      { name: "deploy", status: "pending" },
+      { name: "verify", status: "passed", url: "https://github.com/o/r/runs/1" },
+    ]);
+    expect(pr.ciStatus).toBe("1 failed, 1 pending, 1 passed");
+    await source.pr();
+    expect(gh.calls.filter((c) => c.key.includes("/check-runs"))).toHaveLength(1);
+  });
+
+  test("CI that GitHub refuses (no checks permission) only leaves it out", async () => {
+    const gh = fakeGitHub({
+      [`${JSON_ACCEPT} ${API}/commits/${HEAD}/check-runs?per_page=100`]: () =>
+        Response.json({ message: "Resource not accessible" }, { status: 403 }),
+      [`${JSON_ACCEPT} ${API}/commits/${HEAD}/status?per_page=100`]: () => {
+        throw new Error("offline");
+      },
+    });
+    const pr = await (await open(gh)).pr();
+    expect(pr.checks).toBeUndefined();
+    expect(pr.ciStatus).toBeUndefined();
+    expect(pr.title).toBe("fix(viewer): start fresh when ReviewViewer gets another review");
+  });
+
   test("the diff is GitHub's, read once, and parses into the PR's 4 files", async () => {
     const gh = fakeGitHub();
     const source = await open(gh);
