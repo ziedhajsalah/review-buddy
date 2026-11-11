@@ -9,11 +9,12 @@
  * (`DoneResult.findings`): the finding's id and the decision, never its text.
  */
 import { describeLines, FINDING_SEVERITIES } from "@review-buddy/core/messages";
-import type {
-  FindingAnswer,
-  FindingDecision,
-  FindingSeverity,
-  ResolvedFinding,
+import {
+  type FindingAnswer,
+  type FindingDecision,
+  type FindingSeverity,
+  MAX_FINDING_REASON,
+  type ResolvedFinding,
 } from "@review-buddy/core/types";
 import { useCallback, useMemo } from "react";
 import { useReviewApi } from "../review-api.tsx";
@@ -21,6 +22,7 @@ import { reviewStorageKey } from "./chapterFileSet.ts";
 import { parseStored, usePersistedState } from "./usePersistedState.ts";
 
 export type { FindingAnswer, FindingDecision };
+export { MAX_FINDING_REASON };
 
 /** Most severe first — the one order, shared with the agent-facing text. */
 export const SEVERITIES = FINDING_SEVERITIES;
@@ -144,7 +146,10 @@ export function useFindingAnswers(): {
   const answers = useMemo(() => stored.filter(isAnswer), [stored]);
   const answer = useCallback(
     (id: string, decision: FindingDecision, reason?: string) => {
-      const trimmed = reason?.trim();
+      // Cut as well as trimmed: the server refuses a longer reason, and a
+      // whole review must not fail to submit over one that slipped in (an
+      // older entry in this browser's storage, say).
+      const trimmed = reason?.trim().slice(0, MAX_FINDING_REASON);
       const next: FindingAnswer = { id, decision, ...(trimmed ? { reason: trimmed } : {}) };
       setStored((prev) => [...prev.filter((a) => !(isAnswer(a) && a.id === id)), next]);
     },
@@ -181,5 +186,11 @@ export function answersToSend(
   answers: readonly FindingAnswer[],
 ): FindingAnswer[] {
   const ids = new Set((findings ?? []).map((f) => f.id));
-  return answers.filter((a) => ids.has(a.id));
+  return answers
+    .filter((a) => ids.has(a.id))
+    .map((a) =>
+      a.reason && a.reason.length > MAX_FINDING_REASON
+        ? { ...a, reason: a.reason.slice(0, MAX_FINDING_REASON) }
+        : a,
+    );
 }

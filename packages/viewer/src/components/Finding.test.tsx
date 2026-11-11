@@ -3,6 +3,7 @@ import { afterEach, expect, mock, test } from "bun:test";
 import type { ResolvedFinding } from "@review-buddy/core/types";
 import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { renderWithApi } from "../../test/render.tsx";
+import { MAX_FINDING_REASON } from "../lib/findings.ts";
 import { FindingCard } from "./Finding.tsx";
 
 afterEach(cleanup);
@@ -82,4 +83,16 @@ test("an answered finding shows the decision and its reason, and Undo takes it b
   expect(screen.queryByRole("button", { name: "Fix" })).toBeNull();
   fireEvent.click(button("Undo"));
   expect(onClearAnswer).toHaveBeenCalledWith("f-1");
+});
+
+test("the dismissal reason cannot be typed past what the server accepts", () => {
+  const onAnswer = mock();
+  renderWithApi(<FindingCard finding={finding({ severity: "nit" })} onAnswer={onAnswer} />);
+  fireEvent.click(button("Dismiss"));
+  const field = screen.getByLabelText("Why this finding is dismissed") as HTMLTextAreaElement;
+  expect(field.maxLength).toBe(MAX_FINDING_REASON);
+
+  // Near the limit the field says how much room is left.
+  fireEvent.change(field, { target: { value: "r".repeat(MAX_FINDING_REASON - 10) } });
+  expect(screen.getByText("10 characters left")).toBeDefined();
 });

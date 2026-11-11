@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { DoneResult } from "./types.ts";
+import { MAX_FINDING_REASON } from "./types.ts";
 
 const KeyChange = z.object({ headline: z.string(), detail: z.string() });
 const ReviewFocus = z.object({ summary: z.string(), file: z.string() });
@@ -123,7 +124,7 @@ const ReviewCommentSchema = z.object({
 const FindingAnswerSchema = z.object({
   id: z.string().min(1).max(100),
   decision: z.enum(["fix", "dismiss"]),
-  reason: z.string().max(2000).optional(),
+  reason: z.string().max(MAX_FINDING_REASON).optional(),
 });
 
 /** Shape of POST /api/done. Unknown keys are dropped. */

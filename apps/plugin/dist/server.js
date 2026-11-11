@@ -23937,6 +23937,9 @@ function repoToplevel(cwd) {
     return null;
   }
 }
+// ../../packages/core/src/types.ts
+var MAX_FINDING_REASON = 2000;
+
 // ../../packages/core/src/validate.ts
 var KeyChange = exports_external.object({ headline: exports_external.string(), detail: exports_external.string() });
 var ReviewFocus = exports_external.object({ summary: exports_external.string(), file: exports_external.string() });
@@ -24032,7 +24035,7 @@ var ReviewCommentSchema = exports_external.object({
 var FindingAnswerSchema = exports_external.object({
   id: exports_external.string().min(1).max(100),
   decision: exports_external.enum(["fix", "dismiss"]),
-  reason: exports_external.string().max(2000).optional()
+  reason: exports_external.string().max(MAX_FINDING_REASON).optional()
 });
 var DoneResultSchema = exports_external.object({
   verdict: exports_external.enum(["approve", "request_changes"]).optional(),

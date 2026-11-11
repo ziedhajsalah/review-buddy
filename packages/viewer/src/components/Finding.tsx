@@ -5,7 +5,12 @@ import type {
   ResolvedFinding,
 } from "@review-buddy/core/types";
 import { useState } from "react";
-import { DECISION_LABEL, findingLines, SEVERITY_LABEL } from "../lib/findings.ts";
+import {
+  DECISION_LABEL,
+  findingLines,
+  MAX_FINDING_REASON,
+  SEVERITY_LABEL,
+} from "../lib/findings.ts";
 import { cn } from "../lib/utils.ts";
 import { Markdown } from "./Markdown.tsx";
 import { Button } from "./ui/button.tsx";
@@ -107,10 +112,19 @@ function AnswerForm({
             : "Why not? (optional)"
         }
         rows={2}
+        // The reason the agent is given is cut far shorter than this; the limit
+        // is here so a long one cannot be typed and then refused by the server
+        // when the whole review is submitted.
+        maxLength={MAX_FINDING_REASON}
         aria-label="Why this finding is dismissed"
         className="w-full rounded-md border border-border bg-background px-2 py-1 text-sm"
       />
       <div className="flex items-center justify-end gap-2">
+        {reason.length > MAX_FINDING_REASON - 200 && (
+          <span className="mr-auto text-xs text-muted-foreground">
+            {MAX_FINDING_REASON - reason.length} characters left
+          </span>
+        )}
         <Button
           size="sm"
           variant="ghost"

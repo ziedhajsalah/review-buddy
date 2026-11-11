@@ -13,6 +13,7 @@ import {
   findingCounts,
   findingLines,
   findingToMarkdown,
+  MAX_FINDING_REASON,
   openFindings,
   otherFindings,
   readFindingAnswers,
@@ -190,4 +191,19 @@ test("findingToMarkdown: the answer, with its reason, under the finding", () => 
     }),
   ).toContain("→ Dismissed: by design really");
   expect(findingToMarkdown(finding)).not.toContain("→");
+});
+
+test("answers: a reason longer than the server accepts is cut, not sent whole", () => {
+  const { result } = renderAnswers();
+  act(() => result.current.answer("f1", "dismiss", "r".repeat(MAX_FINDING_REASON + 500)));
+  expect(result.current.answers[0]?.reason).toHaveLength(MAX_FINDING_REASON);
+
+  // And one that got into storage some other way is cut before it is sent.
+  localStorage.setItem(
+    KEY,
+    JSON.stringify([{ id: "f1", decision: "dismiss", reason: "r".repeat(9000) }]),
+  );
+  const { result: reread } = renderAnswers();
+  const sent = answersToSend([f({ id: "f1" })], reread.current.answers);
+  expect(sent[0]?.reason).toHaveLength(MAX_FINDING_REASON);
 });

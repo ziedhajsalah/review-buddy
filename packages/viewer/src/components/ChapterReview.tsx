@@ -205,11 +205,16 @@ function ChapterReviewBody({
       addComment({ ...range, chapterIndex, path, body }),
     [addComment, chapterIndex],
   );
-  // The comment last opened from the list (a new object each time, so the
-  // same one opens again).
-  // A comment or finding opened from the sidebar list: its file and the
-  // selector of its card. A new object each time, so opening it again scrolls.
-  const [opened, setOpened] = useState<{ path: string; selector: string } | null>(null);
+  // A comment or finding opened from the sidebar list: its file, the selector
+  // of its card, and the finding's id when it is one — `n` / `p` step from it,
+  // and two findings' ids can share a prefix (`f-1234`, `f-1234-2`), so the
+  // selector is no way to tell which one is open. A new object each time, so
+  // opening the same one again scrolls to it again.
+  const [opened, setOpened] = useState<{
+    path: string;
+    selector: string;
+    findingId?: string;
+  } | null>(null);
   const diffScrollRef = useRef<HTMLDivElement>(null);
   const copyRef = useRef<CopyMarkdownHandle>(null);
 
@@ -287,14 +292,14 @@ function ChapterReviewBody({
     return keepFileInView(scroller, openFile);
   }, [chapterIndex, openFile]);
 
-  const openItem = (path: string, selector: string) => {
+  const openItem = (path: string, selector: string, findingId?: string) => {
     if (!matching.some((f) => f.path === path)) setFilter("");
-    setOpened({ path, selector });
+    setOpened({ path, selector, findingId });
   };
   const openComment = (comment: LineComment) =>
     openItem(comment.path, `[data-comment-id="${CSS.escape(comment.id)}"]`);
   const openFinding = (finding: ResolvedFinding) =>
-    openItem(finding.path, `[data-finding-id="${CSS.escape(finding.id)}"]`);
+    openItem(finding.path, `[data-finding-id="${CSS.escape(finding.id)}"]`, finding.id);
   // After the filter reset above (its effect clears the focus), so the
   // comment's file keeps it.
   // biome-ignore lint/correctness/useExhaustiveDependencies: only when an item is opened from the list
@@ -317,7 +322,7 @@ function ChapterReviewBody({
   // opened. Only with round-trip, where "unanswered" means anything.
   const stepFinding = (delta: 1 | -1) => {
     if (openHere.length === 0) return;
-    const at = openHere.findIndex((f) => opened?.selector.includes(f.id));
+    const at = openHere.findIndex((f) => f.id === opened?.findingId);
     const next = at === -1 ? (delta === 1 ? 0 : openHere.length - 1) : at + delta;
     const target = openHere[(next + openHere.length) % openHere.length];
     if (target) openFinding(target);

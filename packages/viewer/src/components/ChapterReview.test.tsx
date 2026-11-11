@@ -1,5 +1,6 @@
 /// <reference types="bun-types" />
 import { afterEach, expect, mock, test } from "bun:test";
+import type { ResolvedReview } from "@review-buddy/core/types";
 import { act, cleanup, fireEvent, screen } from "@testing-library/react";
 import { renderWithApi } from "../../test/render.tsx";
 import { commentsToMarkdown, type LineComment } from "../lib/comments.ts";
@@ -813,4 +814,47 @@ test("round-trip: with every finding answered, n has nowhere to go", async () =>
   await screen.findByRole("button", { name: "Request changes" });
   fireEvent.keyDown(document, { key: "n" });
   expect(document.querySelector("[data-focused]")).toBeNull();
+});
+
+test("round-trip: n wraps even when two findings' ids share a prefix", async () => {
+  // resolveFindings gives two findings with the same path and title ids like
+  // "f-1234" and "f-1234-2", so one id is a prefix of the other.
+  const sameTitle: ResolvedReview = {
+    ...fakeReviewWithFindings,
+    findings: [
+      {
+        id: "f-1234",
+        path: MIDDLEWARE,
+        line: 20,
+        side: "new",
+        severity: "important",
+        title: "Same title, twice",
+        chapterIndex: 2,
+      },
+      {
+        id: "f-1234-2",
+        path: SESSION,
+        line: 6,
+        side: "new",
+        severity: "important",
+        title: "Same title, twice",
+        chapterIndex: 2,
+      },
+    ],
+  };
+  renderWithApi(
+    <ChapterReview review={sameTitle} position={1} onNavigate={() => {}} onExit={() => {}} />,
+    fakeReviewApi({ review: sameTitle, roundtrip: true }),
+  );
+  await screen.findByRole("button", { name: "Request changes" });
+
+  fireEvent.keyDown(document, { key: "n" });
+  expect(inCard(MIDDLEWARE, "[data-focused]")).not.toBeNull();
+  fireEvent.keyDown(document, { key: "n" });
+  expect(inCard(SESSION, "[data-focused]")).not.toBeNull();
+  // The third press wraps back to the first, rather than matching "f-1234"
+  // inside "f-1234-2" and staying put.
+  fireEvent.keyDown(document, { key: "n" });
+  expect(inCard(MIDDLEWARE, "[data-focused]")).not.toBeNull();
+  expect(inCard(SESSION, "[data-focused]")).toBeNull();
 });

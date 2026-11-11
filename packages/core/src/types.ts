@@ -315,9 +315,21 @@ export type FindingDecision = "fix" | "dismiss";
 export interface FindingAnswer {
   id: string;
   decision: FindingDecision;
-  /** Why it was dismissed — the agent must not raise it again. */
+  /**
+   * Why it was dismissed — the agent must not raise it again. At most
+   * MAX_FINDING_REASON characters: the viewer holds the reviewer to it, and
+   * the server refuses a longer one.
+   */
   reason?: string;
 }
+
+/**
+ * How long a dismissal reason may be. The viewer's field stops there and the
+ * `/api/done` schema refuses more, so a reason the reviewer can type is always
+ * one the review can be submitted with. (The agent sees it cut much shorter —
+ * see MAX_REASON_CHARS in messages.ts.)
+ */
+export const MAX_FINDING_REASON = 2000;
 
 /** What the viewer sends when the reviewer finishes. Empty = Done with no round-trip. */
 export interface DoneResult {
