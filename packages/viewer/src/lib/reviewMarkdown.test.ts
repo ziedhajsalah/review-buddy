@@ -206,3 +206,14 @@ test("the full review puts each comment under its own chapter", () => {
   expect(ch3 < second).toBe(true);
   expect(md.match(/\*\*Comments\*\*/g)?.length).toBe(2);
 });
+
+test("incomplete CI is said in the copy", () => {
+  const review = {
+    ...fakeReviewWithEvidence,
+    pr: { ...fakeReviewWithEvidence.pr, checksIncomplete: true },
+  };
+  expect(reviewToMarkdown(review)).toContain(
+    "Some checks could not be read, so this list may miss failures.",
+  );
+  expect(reviewToMarkdown(fakeReviewWithEvidence)).not.toContain("could not be read");
+});

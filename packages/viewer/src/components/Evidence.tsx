@@ -36,7 +36,14 @@ export function Evidence({ review }: { review: ResolvedReview }) {
         <p className="text-sm text-muted-foreground">No checks were reported for this change.</p>
       ) : (
         <div className="space-y-3 text-sm">
-          {ci.length > 0 && <CiRow checks={ci} prUrl={pr.url} sha={pr.headRefOid} />}
+          {ci.length > 0 && (
+            <CiRow
+              checks={ci}
+              prUrl={pr.url}
+              sha={pr.headRefOid}
+              incomplete={pr.checksIncomplete === true}
+            />
+          )}
           {agentChecks.length > 0 && (
             <div>
               <h3 className="mb-1 text-xs font-medium text-muted-foreground">
@@ -63,7 +70,17 @@ export function Evidence({ review }: { review: ResolvedReview }) {
   );
 }
 
-function CiRow({ checks, prUrl, sha }: { checks: CiCheck[]; prUrl?: string; sha?: string }) {
+function CiRow({
+  checks,
+  prUrl,
+  sha,
+  incomplete,
+}: {
+  checks: CiCheck[];
+  prUrl?: string;
+  sha?: string;
+  incomplete: boolean;
+}) {
   const shown = ciChecksToShow(checks);
   const passed = checks.filter((c) => c.status === "passed").length;
   const skipped = checks.filter((c) => c.status === "skipped").length;
@@ -107,6 +124,11 @@ function CiRow({ checks, prUrl, sha }: { checks: CiCheck[]; prUrl?: string; sha?
           </li>
         )}
       </ul>
+      {incomplete && (
+        <p className="mt-1 text-xs text-risk-medium">
+          Some checks could not be read, so this list may miss failures. Open all checks on GitHub.
+        </p>
+      )}
     </div>
   );
 }

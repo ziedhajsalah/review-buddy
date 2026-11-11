@@ -14482,7 +14482,6 @@ import { join, sep } from "path";
 import { promisify } from "util";
 
 // ../../packages/core/src/checks.ts
-var MAX_CI_CHECKS = 100;
 var FAILED = new Set([
   "failure",
   "error",
@@ -14547,11 +14546,17 @@ function checksFromRollup(rollup) {
 function finish(checks3) {
   if (checks3.length === 0)
     return;
-  return sortCiChecks(checks3).slice(0, MAX_CI_CHECKS).map((c) => c.url ? c : { name: c.name, status: c.status });
+  return sortCiChecks(checks3).map((c) => c.url ? c : { name: c.name, status: c.status });
 }
 function ciSummary(checks3) {
   const count = (s) => checks3.filter((c) => c.status === s).length;
   return ["failed", "pending", "passed", "skipped"].map((s) => [count(s), s]).filter(([n]) => n > 0).map(([n, s]) => `${n} ${s}`).join(", ");
+}
+function ciMetadata(checks3, incomplete = false) {
+  if (!checks3 || checks3.length === 0)
+    return {};
+  const summary = ciSummary(checks3);
+  return incomplete ? { checks: checks3, ciStatus: `${summary} (incomplete)`, checksIncomplete: true } : { checks: checks3, ciStatus: summary };
 }
 
 // ../../packages/core/src/node/git.ts
@@ -14658,7 +14663,7 @@ function capturePr(cwd, base, ref) {
         head: pr.headRefName ?? branch,
         url: pr.url,
         headRefOid: pr.headRefOid,
-        ...checks3 ? { checks: checks3, ciStatus: ciSummary(checks3) } : {}
+        ...ciMetadata(checks3)
       };
     } catch {}
   }

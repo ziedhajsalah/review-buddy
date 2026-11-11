@@ -116,6 +116,8 @@ can be a second step.
 - Working tree or branch review: the current branch's PR CI is shown only when
   the PR's head commit is the local `HEAD`. Otherwise it is CI of other code.
 - Desktop: built in the same PR. CI is read on the first `pr()` call from the
-  check-runs and statuses APIs; a token without the checks permission only
-  hides the row. The desktop agent has no shell, so its `submit_review`
+  check-runs and statuses APIs, every page (at most 10 pages of 100). A page
+  that fails, or more pages than that, marks the CI "incomplete" in the card,
+  so a part is never shown as the whole. A token without the checks
+  permission only hides the row (or marks it incomplete when statuses exist). The desktop agent has no shell, so its `submit_review`
   schema leaves `verification` out.

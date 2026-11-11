@@ -7,7 +7,7 @@ import { execFile, execFileSync } from "node:child_process";
 import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { join, sep } from "node:path";
 import { promisify } from "node:util";
-import { checksFromRollup, ciSummary } from "../checks.ts";
+import { checksFromRollup, ciMetadata } from "../checks.ts";
 import type { PrMetadata } from "../types.ts";
 
 /** git's hash of the empty tree — used to diff a repo with no commits yet. */
@@ -193,7 +193,7 @@ export function capturePr(cwd: string, base: string, ref?: string): PrMetadata {
         head: pr.headRefName ?? branch,
         url: pr.url,
         headRefOid: pr.headRefOid,
-        ...(checks ? { checks, ciStatus: ciSummary(checks) } : {}),
+        ...ciMetadata(checks),
       };
     } catch {
       /* fall through to git fallback */

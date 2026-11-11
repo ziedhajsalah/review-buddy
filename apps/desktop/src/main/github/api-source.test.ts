@@ -91,7 +91,7 @@ describe("openGitHubPr (recorded responses)", () => {
 
   test("CI of the head commit: check runs and statuses, read once, failed first", async () => {
     const gh = fakeGitHub({
-      [`${JSON_ACCEPT} ${API}/commits/${HEAD}/check-runs?per_page=100`]: () =>
+      [`${JSON_ACCEPT} ${API}/commits/${HEAD}/check-runs?per_page=100&page=1`]: () =>
         Response.json({
           check_runs: [
             {
@@ -103,7 +103,7 @@ describe("openGitHubPr (recorded responses)", () => {
             { name: "e2e", status: "completed", conclusion: "failure" },
           ],
         }),
-      [`${JSON_ACCEPT} ${API}/commits/${HEAD}/status?per_page=100`]: () =>
+      [`${JSON_ACCEPT} ${API}/commits/${HEAD}/status?per_page=100&page=1`]: () =>
         Response.json({ statuses: [{ context: "deploy", state: "pending" }] }),
     });
     const source = await open(gh);
@@ -118,11 +118,80 @@ describe("openGitHubPr (recorded responses)", () => {
     expect(gh.calls.filter((c) => c.key.includes("/check-runs"))).toHaveLength(1);
   });
 
+  const runsPage = (page: number) =>
+    `${JSON_ACCEPT} ${API}/commits/${HEAD}/check-runs?per_page=100&page=${page}`;
+  const passing = (n: number, from = 0) =>
+    Array.from({ length: n }, (_, i) => ({
+      name: `matrix ${from + i}`,
+      status: "completed",
+      conclusion: "success",
+    }));
+  const nextLink = (page: number) => ({
+    link: `<${API}/commits/${HEAD}/check-runs?per_page=100&page=${page + 1}>; rel="next"`,
+  });
+
+  test("CI: every page of check runs is read, so a failure on page 2 is not lost", async () => {
+    const gh = fakeGitHub({
+      [runsPage(1)]: () => Response.json({ check_runs: passing(100) }, { headers: nextLink(1) }),
+      [runsPage(2)]: () =>
+        Response.json({
+          check_runs: [{ name: "matrix 100", status: "completed", conclusion: "failure" }],
+        }),
+      [`${JSON_ACCEPT} ${API}/commits/${HEAD}/status?per_page=100&page=1`]: () =>
+        Response.json({ statuses: [] }),
+    });
+    const pr = await (await open(gh)).pr();
+    expect(pr.checks).toHaveLength(101);
+    expect(pr.checks?.[0]).toEqual({ name: "matrix 100", status: "failed" });
+    expect(pr.ciStatus).toBe("1 failed, 100 passed");
+    expect(pr.checksIncomplete).toBeUndefined();
+  });
+
+  test("CI: a page that fails marks the evidence incomplete", async () => {
+    const gh = fakeGitHub({
+      [runsPage(1)]: () => Response.json({ check_runs: passing(100) }, { headers: nextLink(1) }),
+      [runsPage(2)]: () => Response.json({ message: "Server Error" }, { status: 502 }),
+      [`${JSON_ACCEPT} ${API}/commits/${HEAD}/status?per_page=100&page=1`]: () =>
+        Response.json({ statuses: [] }),
+    });
+    const pr = await (await open(gh)).pr();
+    expect(pr.checks).toHaveLength(100);
+    expect(pr.checksIncomplete).toBe(true);
+    expect(pr.ciStatus).toBe("100 passed (incomplete)");
+  });
+
+  test("CI: more pages than we read marks the evidence incomplete", async () => {
+    const routes: Record<string, () => Response> = {
+      [`${JSON_ACCEPT} ${API}/commits/${HEAD}/status?per_page=100&page=1`]: () =>
+        Response.json({ statuses: [] }),
+    };
+    for (let page = 1; page <= 11; page++) {
+      routes[runsPage(page)] = () =>
+        Response.json({ check_runs: passing(100, (page - 1) * 100) }, { headers: nextLink(page) });
+    }
+    const gh = fakeGitHub(routes);
+    const pr = await (await open(gh)).pr();
+    expect(gh.calls.filter((c) => c.key.includes("/check-runs"))).toHaveLength(10);
+    expect(pr.checks).toHaveLength(1000);
+    expect(pr.checksIncomplete).toBe(true);
+  });
+
+  test("CI: check runs refused but statuses read → shown, marked incomplete", async () => {
+    const gh = fakeGitHub({
+      [runsPage(1)]: () => Response.json({ message: "Resource not accessible" }, { status: 403 }),
+      [`${JSON_ACCEPT} ${API}/commits/${HEAD}/status?per_page=100&page=1`]: () =>
+        Response.json({ statuses: [{ context: "deploy", state: "success" }] }),
+    });
+    const pr = await (await open(gh)).pr();
+    expect(pr.checks).toEqual([{ name: "deploy", status: "passed" }]);
+    expect(pr.checksIncomplete).toBe(true);
+  });
+
   test("CI that GitHub refuses (no checks permission) only leaves it out", async () => {
     const gh = fakeGitHub({
-      [`${JSON_ACCEPT} ${API}/commits/${HEAD}/check-runs?per_page=100`]: () =>
+      [`${JSON_ACCEPT} ${API}/commits/${HEAD}/check-runs?per_page=100&page=1`]: () =>
         Response.json({ message: "Resource not accessible" }, { status: 403 }),
-      [`${JSON_ACCEPT} ${API}/commits/${HEAD}/status?per_page=100`]: () => {
+      [`${JSON_ACCEPT} ${API}/commits/${HEAD}/status?per_page=100&page=1`]: () => {
         throw new Error("offline");
       },
     });

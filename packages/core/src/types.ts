@@ -160,6 +160,11 @@ export interface PrMetadata {
    * review opens. Undefined when there is no PR, no `gh`, or no checks.
    */
   checks?: CiCheck[];
+  /**
+   * True when some checks could not be read (a page failed, or too many
+   * pages): `checks` may miss failures.
+   */
+  checksIncomplete?: boolean;
   /** PR head commit SHA (PR mode only) — drives file-content expansion. */
   headRefOid?: string;
 }

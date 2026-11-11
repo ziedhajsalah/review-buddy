@@ -1,5 +1,11 @@
 import { expect, test } from "bun:test";
-import { checksFromRest, checksFromRollup, ciCheckStatus, ciSummary } from "./checks.ts";
+import {
+  checksFromRest,
+  checksFromRollup,
+  ciCheckStatus,
+  ciMetadata,
+  ciSummary,
+} from "./checks.ts";
 
 test("maps GitHub's words to a status, in any case", () => {
   expect(ciCheckStatus("COMPLETED", "SUCCESS")).toBe("passed");
@@ -97,4 +103,28 @@ test("summarizes only the counts that are not zero", () => {
     ]),
   ).toBe("1 failed, 2 passed");
   expect(ciSummary([])).toBe("");
+});
+
+test("keeps every check (no cap), so a failure after 100 passes is kept and counted", () => {
+  const runs = Array.from({ length: 150 }, (_, i) => ({
+    name: `run ${i}`,
+    status: "completed",
+    conclusion: i === 149 ? "failure" : "success",
+  }));
+  const checks = checksFromRest({ check_runs: runs }, undefined);
+  expect(checks).toHaveLength(150);
+  expect(checks?.[0]).toEqual({ name: "run 149", status: "failed" });
+  expect(ciSummary(checks ?? [])).toBe("1 failed, 149 passed");
+});
+
+test("ciMetadata: summary, the incomplete flag, and nothing without checks", () => {
+  const checks = [{ name: "a", status: "passed" as const }];
+  expect(ciMetadata(checks)).toEqual({ checks, ciStatus: "1 passed" });
+  expect(ciMetadata(checks, true)).toEqual({
+    checks,
+    ciStatus: "1 passed (incomplete)",
+    checksIncomplete: true,
+  });
+  expect(ciMetadata(undefined, true)).toEqual({});
+  expect(ciMetadata([])).toEqual({});
 });

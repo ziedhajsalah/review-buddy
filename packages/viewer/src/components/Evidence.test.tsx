@@ -83,3 +83,16 @@ test("only not_covered still counts as evidence", () => {
   expect(card.textContent).not.toContain("No checks were reported");
   expect(card.textContent).toContain("I ran nothing.");
 });
+
+test("incomplete CI says the list may miss failures", () => {
+  const review = { ...ciOnly, pr: { ...ciOnly.pr, checksIncomplete: true } };
+  render(<Evidence review={review} />);
+  expect(screen.getByRole("region").textContent).toContain(
+    "Some checks could not be read, so this list may miss failures.",
+  );
+});
+
+test("complete CI has no such note", () => {
+  render(<Evidence review={ciOnly} />);
+  expect(screen.getByRole("region").textContent).not.toContain("could not be read");
+});

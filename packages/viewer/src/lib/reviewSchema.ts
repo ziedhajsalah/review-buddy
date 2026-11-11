@@ -54,6 +54,7 @@ const PrMetadataSchema = z.object({
   url: z.string().optional(),
   ciStatus: z.string().optional(),
   checks: z.array(CiCheckSchema).optional(),
+  checksIncomplete: z.boolean().optional(),
   headRefOid: z.string().optional(),
 });
 

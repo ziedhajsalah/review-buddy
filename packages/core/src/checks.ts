@@ -3,10 +3,7 @@
  * statusCheckRollup` (plugin) and the REST check-runs and statuses (desktop).
  * Runtime-neutral: it only reads plain JSON.
  */
-import type { CiCheck, CiCheckStatus } from "./types.ts";
-
-/** At most this many checks are kept; a PR with more is rare. */
-export const MAX_CI_CHECKS = 100;
+import type { CiCheck, CiCheckStatus, PrMetadata } from "./types.ts";
 
 const FAILED = new Set([
   "failure",
@@ -119,11 +116,14 @@ export function checksFromRest(checkRuns: unknown, combinedStatus: unknown): CiC
   return finish(checks);
 }
 
+/**
+ * Sorted, never cut: a cap taken before or after sorting would make the
+ * counts wrong, and a cap before sorting could drop a failure. The callers
+ * bound the size by how many pages they read.
+ */
 function finish(checks: CiCheck[]): CiCheck[] | undefined {
   if (checks.length === 0) return undefined;
-  return sortCiChecks(checks)
-    .slice(0, MAX_CI_CHECKS)
-    .map((c) => (c.url ? c : { name: c.name, status: c.status }));
+  return sortCiChecks(checks).map((c) => (c.url ? c : { name: c.name, status: c.status }));
 }
 
 /** "12 passed, 1 failed, 2 pending" — only the counts that are not zero. */
@@ -134,4 +134,20 @@ export function ciSummary(checks: readonly CiCheck[]): string {
     .filter(([n]) => n > 0)
     .map(([n, s]) => `${n} ${s}`)
     .join(", ");
+}
+
+/**
+ * The CI fields of PrMetadata. `incomplete`: some checks could not be read (a
+ * page failed, or there were more pages than the source reads), so the list
+ * may miss failures and must not be shown as the commit's whole CI.
+ */
+export function ciMetadata(
+  checks: CiCheck[] | undefined,
+  incomplete = false,
+): Pick<PrMetadata, "checks" | "ciStatus" | "checksIncomplete"> {
+  if (!checks || checks.length === 0) return {};
+  const summary = ciSummary(checks);
+  return incomplete
+    ? { checks, ciStatus: `${summary} (incomplete)`, checksIncomplete: true }
+    : { checks, ciStatus: summary };
 }

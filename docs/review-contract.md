@@ -93,7 +93,8 @@ Types for both live in `packages/core/src/types.ts`.
     "url": "https://github.com/acme/app/pull/123",   // optional
     "headRefOid": "7e8e705…",                          // optional: the PR's head commit
     "ciStatus": "1 failed, 12 passed",                 // optional: short summary of `checks`
-    "checks": [                                        // optional: CI of headRefOid, failed first
+    "checksIncomplete": true,                          // optional: some checks could not be read
+    "checks": [                                        // optional: CI of headRefOid, failed first, never cut
       { "name": "CI / test (windows)", "status": "failed",
         "url": "https://github.com/acme/app/actions/runs/1/job/3" },
       { "name": "CI / lint", "status": "passed" }
@@ -145,6 +146,6 @@ Types for both live in `packages/core/src/types.ts`.
 4. Any real hunk not claimed by any chapter ⇒ append to a synthetic `"Unsorted changes"` chapter and log it (never drop changes).
 5. Attach `meta` and `pr` (B), derive `language` per file.
 
-**CI checks (`pr.checks`).** Read once, when the review opens, from GitHub — never run by Review Buddy. The plugin reads `statusCheckRollup` from `gh pr view`; the desktop app reads the commit's check runs and statuses from the REST API. `status` is `passed` | `failed` | `pending` | `skipped`; only `https` links are kept. Without a PR, without `gh`, or when GitHub refuses, the field is absent and the viewer shows no CI row. When the review is not of a PR by ref (working tree or branch), the current branch's PR CI is kept only if its head commit is the local `HEAD`, so the reviewer never sees CI of other code.
+**CI checks (`pr.checks`).** Read once, when the review opens, from GitHub — never run by Review Buddy. The plugin reads `statusCheckRollup` from `gh pr view`; the desktop app reads the commit's check runs and statuses from the REST API and follows every page (at most 10 pages of 100 each). The list is never cut, so no failure is dropped and the counts in `ciStatus` are right. When a page fails, or there are more pages than that, `checksIncomplete` is `true`, `ciStatus` ends with "(incomplete)", and the viewer says the list may miss failures. `status` is `passed` | `failed` | `pending` | `skipped`; only `https` links are kept. Without a PR, without `gh`, or when GitHub refuses, the field is absent and the viewer shows no CI row. When the review is not of a PR by ref (working tree or branch), the current branch's PR CI is kept only if its head commit is the local `HEAD`, so the reviewer never sees CI of other code.
 
 `/api/file-content?path=&side=base|head` serves full files on demand for "expand full file" and word-level context (source C) — never inlined into `/api/review`.

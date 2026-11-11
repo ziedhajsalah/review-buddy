@@ -139,6 +139,9 @@ function evidenceToMarkdown(review: ResolvedReview): string {
     out.push(`**CI (GitHub)**: ${review.pr.ciStatus || `${ci.length} checks`}`);
     const shown = ciChecksToShow(ci);
     if (shown.length > 0) out.push("", ...shown.map((c) => `- ${c.name} — ${c.status}`));
+    if (review.pr.checksIncomplete) {
+      out.push("", "Some checks could not be read, so this list may miss failures.");
+    }
   }
   const agent = agentChecksInOrder(review.verification?.checks ?? []);
   if (agent.length > 0) {
