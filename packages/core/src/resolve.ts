@@ -270,7 +270,13 @@ export function resolveReview(
     filesChanged: parsedFiles.length,
   };
 
-  const findings = resolveFindings(agent.findings ?? [], chapters, findFile);
+  // Findings carry a tool's own path, so they are matched EXACTLY (head or
+  // pre-rename), never by `findFile`'s basename guess: a finding in an
+  // untouched file that shares a basename with a changed one would otherwise be
+  // rewritten onto that file and shown on an unrelated line.
+  const findings = resolveFindings(agent.findings ?? [], chapters, (path) =>
+    byPath.get(normalizePath(path)),
+  );
 
   return {
     review: {
@@ -311,12 +317,12 @@ function hunkCovers(h: ResolvedHunk, side: "old" | "new", line: number): boolean
 function resolveFindings(
   agentFindings: readonly AgentFinding[],
   chapters: readonly ResolvedChapter[],
-  findFile: (path: string) => ParsedFile | undefined,
+  exactFile: (path: string) => ParsedFile | undefined,
 ): ResolvedFinding[] {
   const seen = new Map<string, number>();
   return agentFindings.map((f) => {
     const side = f.side ?? "new";
-    const parsed = findFile(f.path);
+    const parsed = exactFile(f.path);
     const path = parsed ? parsed.path : normalizePath(f.path);
     const withFile = parsed
       ? chapters.filter((ch) => ch.files.some((cf) => cf.path === parsed.path))

@@ -649,6 +649,17 @@ describe("resolveReview — findings (plan 019)", () => {
     expect(f!.outsideDiff).toBeUndefined();
   });
 
+  test("an untouched file sharing a basename with a changed one stays unmatched", () => {
+    // SAMPLE's only useSport.ts is src/dashboard/useSport.ts; a finding in a
+    // DIFFERENT file of the same name must not be rewritten onto it.
+    const [f] = resolve([
+      finding({ path: "src/legacy/useSport.ts", line: 13, severity: "pre_existing" }),
+    ]);
+    expect(f!.path).toBe("src/legacy/useSport.ts");
+    expect(f!.chapterIndex).toBeUndefined();
+    expect(f!.outsideDiff).toBeUndefined();
+  });
+
   test("a renamed file named by its old path gets the new path", () => {
     const rename = `diff --git a/old-name.ts b/new-name.ts
 similarity index 90%
