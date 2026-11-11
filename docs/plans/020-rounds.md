@@ -152,8 +152,10 @@ Steps 1–5 alone fix the lost viewed marks and can ship first — and did.
   `ParsedFile`): a binary file's bytes are not in the diff, so hunks alone
   hash two different images alike and the reviewer keeps a stale viewed mark.
   Where a diff carries neither content nor an index line — a pure mode change
-  — there is nothing to compare, so the file gets no fingerprint and reads as
-  changed every round.
+  — there is nothing to compare, so the file is fingerprinted `UNCOMPARABLE`:
+  a value that never equals anything, itself included, so the file stays in
+  the comparison and reads as changed every round. Leaving it out of the map
+  instead would drop it from `changedPaths` too, which part 2 reads.
 - `/api/done` accepts **one** verdict and refuses later ones with 409. Before
   the round store that only dropped a second tab's result silently; now it
   would rewrite or clear what the first verdict stored.

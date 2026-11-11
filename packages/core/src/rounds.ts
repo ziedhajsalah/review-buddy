@@ -42,6 +42,15 @@ export interface RoundState {
 /** How a file compares with the previous round. */
 export type FileChange = "unchanged" | "changed" | "new";
 
+/**
+ * The fingerprint of a file two rounds cannot be compared on: its diff spells
+ * out no content and carries no `index` line either — a pure mode change, or
+ * a source that strips index lines. It never equals anything, including
+ * itself, so such a file reads as changed in every round. Not a hash: it
+ * cannot collide with one (they are eight hex digits).
+ */
+export const UNCOMPARABLE = "uncomparable";
+
 /** FNV-1a (32-bit), as hex. Short, stable across runtimes, no dependencies. */
 function fnv1a(text: string): string {
   let hash = 0x811c9dc5;
@@ -60,16 +69,21 @@ function fnv1a(text: string): string {
  * changed nothing there.
  *
  * A file whose diff spells out no content and carries no `index` line either
- * — a pure mode change, a source that strips index lines — gets **no**
- * fingerprint at all, and so reads as changed in every round. Nothing in such
- * a diff can tell two versions of it apart, and showing a file again costs
- * the reviewer a glance, while marking a changed one viewed costs them the
+ * — a pure mode change, a source that strips index lines — is fingerprinted
+ * `UNCOMPARABLE`, and so reads as changed in every round. Nothing in such a
+ * diff can tell two versions of it apart, and showing a file again costs the
+ * reviewer a glance, while marking a changed one viewed costs them the
  * change itself.
  */
 export function fileFingerprints(files: readonly ParsedFile[]): Record<string, string> {
   const out: Record<string, string> = {};
   for (const file of files) {
-    if (file.hunks.length === 0 && !file.index) continue;
+    if (file.hunks.length === 0 && !file.index) {
+      // Still fingerprinted, so the file stays in the comparison and part 2
+      // can mark it changed — it is in the diff, after all.
+      out[file.path] = UNCOMPARABLE;
+      continue;
+    }
     // The index line is what identifies the two versions of a binary file,
     // whose bytes the diff never carries: without it two different images
     // would hash alike and the reviewer would keep a stale viewed mark.
@@ -83,10 +97,9 @@ export function fileFingerprints(files: readonly ParsedFile[]): Record<string, s
 /**
  * Compare this round's fingerprints with the previous round's. A path the
  * previous round did not have is `new`; one the previous round had with
- * another fingerprint is `changed`. Paths that are gone — and the ones
- * `fileFingerprints` deliberately leaves out — are simply absent, which
- * `roundInfo` treats as changed: it carries over only what it can see is
- * untouched.
+ * another fingerprint is `changed`, as is one whose fingerprint on either
+ * side is `UNCOMPARABLE`. Paths that are gone from the diff are simply
+ * absent: there is nothing left to show for them.
  */
 export function compareRounds(
   previous: Readonly<Record<string, string>> | undefined,
@@ -95,7 +108,14 @@ export function compareRounds(
   const out: Record<string, FileChange> = {};
   for (const [path, hash] of Object.entries(current)) {
     const before = previous?.[path];
-    out[path] = before === undefined ? "new" : before === hash ? "unchanged" : "changed";
+    if (before === undefined) {
+      out[path] = "new";
+      continue;
+    }
+    // The sentinel is checked before equality: two uncomparable rounds of one
+    // file are not evidence that it stayed the same.
+    const comparable = hash !== UNCOMPARABLE && before !== UNCOMPARABLE;
+    out[path] = comparable && before === hash ? "unchanged" : "changed";
   }
   return out;
 }

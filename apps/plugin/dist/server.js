@@ -24536,6 +24536,7 @@ function allowedPaths(review) {
 }
 
 // ../../packages/core/src/rounds.ts
+var UNCOMPARABLE = "uncomparable";
 function fnv1a(text) {
   let hash2 = 2166136261;
   for (let i = 0;i < text.length; i++) {
@@ -24547,8 +24548,10 @@ function fnv1a(text) {
 function fileFingerprints(files) {
   const out = {};
   for (const file2 of files) {
-    if (file2.hunks.length === 0 && !file2.index)
+    if (file2.hunks.length === 0 && !file2.index) {
+      out[file2.path] = UNCOMPARABLE;
       continue;
+    }
     const parts = [file2.changeType, file2.oldPath ?? "", file2.binary ? "bin" : "", file2.index ?? ""];
     for (const hunk of file2.hunks)
       parts.push(hunk.header, ...hunk.lines);
@@ -24561,7 +24564,12 @@ function compareRounds(previous, current) {
   const out = {};
   for (const [path, hash2] of Object.entries(current)) {
     const before = previous?.[path];
-    out[path] = before === undefined ? "new" : before === hash2 ? "unchanged" : "changed";
+    if (before === undefined) {
+      out[path] = "new";
+      continue;
+    }
+    const comparable = hash2 !== UNCOMPARABLE && before !== UNCOMPARABLE;
+    out[path] = comparable && before === hash2 ? "unchanged" : "changed";
   }
   return out;
 }

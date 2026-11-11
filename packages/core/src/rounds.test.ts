@@ -8,6 +8,7 @@ import {
   parseRoundState,
   type RoundState,
   roundInfo,
+  UNCOMPARABLE,
 } from "./rounds.ts";
 import type { ReviewComment } from "./types.ts";
 
@@ -117,14 +118,21 @@ test("fileFingerprints: a binary file's new bytes show, through git's index line
   ).toMatchObject({ changedPaths: ["assets/logo.png"], viewedPaths: [] });
 });
 
-test("fileFingerprints: a mode-only change has nothing to hash, so it reads as changed", () => {
-  // git emits no index line for a pure mode change and no hunks either: there
-  // is nothing in the diff to tell the two versions apart, so it gets no
-  // fingerprint and is shown again every round.
+test("fileFingerprints: a mode-only change is uncomparable, so it reads as changed", () => {
+  // git emits no index line for a pure mode change and no hunks either, so
+  // there is nothing in the diff to tell the two versions apart.
   const prints = fileFingerprints([binary({ path: "run.sh", binary: false, index: undefined })]);
-  expect(prints).toEqual({});
-  const info = roundInfo(stored({ files: {}, viewed: ["run.sh"] }), prints);
+  expect(prints).toEqual({ "run.sh": UNCOMPARABLE });
+
+  // It is in the diff, so it is listed as changed — and it never keeps a
+  // viewed mark, not even when both rounds are equally uncomparable.
+  const info = roundInfo(
+    stored({ files: { "run.sh": UNCOMPARABLE }, viewed: ["run.sh"], comments: [] }),
+    prints,
+  );
+  expect(info?.changedPaths).toEqual(["run.sh"]);
   expect(info?.viewedPaths).toEqual([]);
+  expect(commentStatus({ path: "run.sh" }, compareRounds(prints, prints))).toBe("lines_changed");
 });
 
 test("fileFingerprints: a text file is identified by its hunks, index line or not", () => {
