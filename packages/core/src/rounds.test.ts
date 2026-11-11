@@ -91,6 +91,50 @@ const stored = (over: Partial<RoundState> = {}): RoundState => ({
   ...over,
 });
 
+const binary = (over: Partial<ParsedFile> = {}): ParsedFile => ({
+  path: "assets/logo.png",
+  changeType: "modified",
+  binary: true,
+  additions: 0,
+  deletions: 0,
+  hunks: [],
+  index: "aaaaaaa..bbbbbbb 100644",
+  ...over,
+});
+
+test("fileFingerprints: a binary file's new bytes show, through git's index line", () => {
+  // A binary diff carries no content, so the index line is the only thing that
+  // tells the two versions apart. Without it the reviewer would keep a viewed
+  // mark on an image that changed.
+  const before = fileFingerprints([binary()])["assets/logo.png"];
+  const after = fileFingerprints([binary({ index: "aaaaaaa..ccccccc 100644" })])["assets/logo.png"];
+  expect(before).toBeDefined();
+  expect(after).not.toBe(before);
+  expect(
+    roundInfo(stored({ files: { "assets/logo.png": before! }, viewed: ["assets/logo.png"] }), {
+      "assets/logo.png": after!,
+    }),
+  ).toMatchObject({ changedPaths: ["assets/logo.png"], viewedPaths: [] });
+});
+
+test("fileFingerprints: a mode-only change has nothing to hash, so it reads as changed", () => {
+  // git emits no index line for a pure mode change and no hunks either: there
+  // is nothing in the diff to tell the two versions apart, so it gets no
+  // fingerprint and is shown again every round.
+  const prints = fileFingerprints([binary({ path: "run.sh", binary: false, index: undefined })]);
+  expect(prints).toEqual({});
+  const info = roundInfo(stored({ files: {}, viewed: ["run.sh"] }), prints);
+  expect(info?.viewedPaths).toEqual([]);
+});
+
+test("fileFingerprints: a text file is identified by its hunks, index line or not", () => {
+  const withIndex = fileFingerprints([file({ index: "111..222 100644" })])["src/a.ts"];
+  const without = fileFingerprints([file()])["src/a.ts"];
+  expect(withIndex).toBeDefined();
+  expect(without).toBeDefined();
+  expect(withIndex).not.toBe(without);
+});
+
 test("roundInfo: no previous round → no rounds at all", () => {
   expect(roundInfo(undefined, { "src/a.ts": "aaaa" })).toBeUndefined();
 });

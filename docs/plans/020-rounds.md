@@ -148,6 +148,17 @@ Steps 1–5 alone fix the lost viewed marks and can ship first — and did.
 - The fingerprints are per **file**, not per hunk, so `commentStatus` is per
   file too. A comment on a file no longer in the diff counts as
   `lines_changed`: what it pointed at is gone as well.
+- A fingerprint has to include git's **`index` line** (now kept on
+  `ParsedFile`): a binary file's bytes are not in the diff, so hunks alone
+  hash two different images alike and the reviewer keeps a stale viewed mark.
+  Where a diff carries neither content nor an index line — a pure mode change
+  — there is nothing to compare, so the file gets no fingerprint and reads as
+  changed every round.
+- `/api/done` accepts **one** verdict and refuses later ones with 409. Before
+  the round store that only dropped a second tab's result silently; now it
+  would rewrite or clear what the first verdict stored.
+- The round store is keyed by the repository's **top level**, not the cwd the
+  hook was handed, or a re-review from a subdirectory would start over.
 
 ## Tests
 

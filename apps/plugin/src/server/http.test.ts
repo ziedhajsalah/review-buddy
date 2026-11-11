@@ -414,6 +414,55 @@ describe("HTTP server", () => {
     }
   });
 
+  test("a second verdict is refused: one review, one verdict, one recorded round", async () => {
+    const seen: DoneResult[] = [];
+    const s = startServer({
+      review,
+      cwd: dir,
+      source: localGitSource(dir),
+      onDone: (r) => seen.push(r),
+    });
+    try {
+      const post = (body: unknown) =>
+        fetch(`http://127.0.0.1:${s.port}/api/done`, {
+          method: "POST",
+          headers: { "content-type": "application/json", "x-review-buddy-token": s.token },
+          body: JSON.stringify(body),
+        });
+      // The server keeps serving for a moment after the first Done (the
+      // response has to flush), so a second tab of the same review can post
+      // in that window.
+      expect((await post({ verdict: "request_changes", viewed: ["app.ts"] })).status).toBe(200);
+      const second = await post({ verdict: "approve" });
+      expect(second.status).toBe(409);
+      expect(await second.json()).toMatchObject({ error: expect.stringContaining("already") });
+      // The approval neither reaches the agent nor clears the round the first
+      // verdict stored.
+      expect(seen).toEqual([{ verdict: "request_changes", viewed: ["app.ts"] }]);
+      expect((await s.done).verdict).toBe("request_changes");
+    } finally {
+      s.stop();
+    }
+  });
+
+  test("a malformed body is not a submission: the reviewer can still finish", async () => {
+    const s = startServer({ review, cwd: dir, source: localGitSource(dir) });
+    try {
+      const post = (body: string) =>
+        fetch(`http://127.0.0.1:${s.port}/api/done`, {
+          method: "POST",
+          headers: { "content-type": "application/json", "x-review-buddy-token": s.token },
+          body,
+        });
+      expect((await post('{"verdict":"nope"}')).status).toBe(400);
+      expect((await post("{ not json")).status).toBe(400);
+      expect((await post('{"verdict":"approve"}')).status).toBe(200);
+      expect((await s.done).verdict).toBe("approve");
+    } finally {
+      s.stop();
+    }
+  });
+
   test("the server never calls onDone when it is stopped instead of finished", async () => {
     let calls = 0;
     const s = startServer({

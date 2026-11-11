@@ -54,14 +54,26 @@ function fnv1a(text: string): string {
 }
 
 /**
- * A fingerprint per file of the parsed diff: the change type and every hunk's
- * header and lines. Two rounds whose fingerprints match for a path have the
- * same diff for that file — the agent changed nothing there.
+ * A fingerprint per file of the parsed diff: the change type, git's own
+ * `index` line, and every hunk's header and lines. Two rounds whose
+ * fingerprints match for a path have the same diff for that file — the agent
+ * changed nothing there.
+ *
+ * A file whose diff spells out no content and carries no `index` line either
+ * — a pure mode change, a source that strips index lines — gets **no**
+ * fingerprint at all, and so reads as changed in every round. Nothing in such
+ * a diff can tell two versions of it apart, and showing a file again costs
+ * the reviewer a glance, while marking a changed one viewed costs them the
+ * change itself.
  */
 export function fileFingerprints(files: readonly ParsedFile[]): Record<string, string> {
   const out: Record<string, string> = {};
   for (const file of files) {
-    const parts = [file.changeType, file.oldPath ?? "", file.binary ? "bin" : ""];
+    if (file.hunks.length === 0 && !file.index) continue;
+    // The index line is what identifies the two versions of a binary file,
+    // whose bytes the diff never carries: without it two different images
+    // would hash alike and the reviewer would keep a stale viewed mark.
+    const parts = [file.changeType, file.oldPath ?? "", file.binary ? "bin" : "", file.index ?? ""];
     for (const hunk of file.hunks) parts.push(hunk.header, ...hunk.lines);
     out[file.path] = fnv1a(parts.join("\n"));
   }
@@ -71,8 +83,10 @@ export function fileFingerprints(files: readonly ParsedFile[]): Record<string, s
 /**
  * Compare this round's fingerprints with the previous round's. A path the
  * previous round did not have is `new`; one the previous round had with
- * another fingerprint is `changed`. Paths that are gone are simply absent —
- * there is nothing left to show for them.
+ * another fingerprint is `changed`. Paths that are gone — and the ones
+ * `fileFingerprints` deliberately leaves out — are simply absent, which
+ * `roundInfo` treats as changed: it carries over only what it can see is
+ * untouched.
  */
 export function compareRounds(
   previous: Readonly<Record<string, string>> | undefined,

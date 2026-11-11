@@ -24146,6 +24146,8 @@ function parseDiff(raw) {
       file2.path = unquotePath(line.slice("copy to ".length));
     } else if (line.startsWith("Binary files ") || line.startsWith("GIT binary patch")) {
       file2.binary = true;
+    } else if (line.startsWith("index ")) {
+      file2.index = line.slice("index ".length).trim();
     } else if (line.startsWith("--- ")) {
       const p = headerPath(line.slice(4));
       if (p !== "/dev/null" && !file2.oldPath)
@@ -24545,7 +24547,9 @@ function fnv1a(text) {
 function fileFingerprints(files) {
   const out = {};
   for (const file2 of files) {
-    const parts = [file2.changeType, file2.oldPath ?? "", file2.binary ? "bin" : ""];
+    if (file2.hunks.length === 0 && !file2.index)
+      continue;
+    const parts = [file2.changeType, file2.oldPath ?? "", file2.binary ? "bin" : "", file2.index ?? ""];
     for (const hunk of file2.hunks)
       parts.push(hunk.header, ...hunk.lines);
     out[file2.path] = fnv1a(parts.join(`
@@ -24678,6 +24682,7 @@ function startServer(ctx) {
   const done = new Promise((res) => {
     resolveDone = res;
   });
+  let finished = false;
   const allowed = allowedPaths(ctx.review);
   const token = crypto.randomUUID();
   const server = Bun.serve({
@@ -24715,6 +24720,8 @@ function startServer(ctx) {
         return json2({ path, side, language: languageOf(path), content });
       }
       if (pathname === "/api/done" && req.method === "POST") {
+        if (finished)
+          return json2({ error: "this review was already submitted" }, 409);
         const len = Number(req.headers.get("content-length") ?? "0");
         if (len > MAX_DONE_BODY)
           return json2({ error: "body too large" }, 413);
@@ -24730,6 +24737,7 @@ function startServer(ctx) {
         const parsed = parseDoneResult(raw);
         if (!parsed.ok)
           return json2({ error: parsed.error }, 400);
+        finished = true;
         const answered = answeredFindings(ctx.review.findings, parsed.value.findings);
         const body = {
           ...parsed.value,
@@ -24941,7 +24949,7 @@ function roundtripEnabled(env = process.env) {
   return !(value && ["0", "false", "off", "no"].includes(value));
 }
 function openRounds(cwd, agent, diff) {
-  const store = roundStore(cwd, agent.source);
+  const store = roundStore(repoToplevel(cwd) ?? cwd, agent.source);
   cleanupRounds();
   const previous = store.read();
   const current = fileFingerprints(parseDiff(diff));

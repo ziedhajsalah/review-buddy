@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AgentReview } from "@review-buddy/core/types";
@@ -100,6 +101,37 @@ test("openRounds: Done with no verdict is an approval — it ends the chain too"
     openRounds("/repo", agent, DIFF).save({ verdict: "request_changes", viewed: [] });
     openRounds("/repo", agent, DIFF).save({});
     expect(openRounds("/repo", agent, DIFF).info).toBeUndefined();
+  });
+});
+
+test("openRounds: one chain per repository, whichever directory the agent ran in", () => {
+  withStateDir(() => {
+    // A real repo, so `git rev-parse --show-toplevel` has something to answer.
+    const repo = mkdtempSync(join(tmpdir(), "rb-repo-"));
+    const git = (...args: string[]) => execFileSync("git", args, { cwd: repo, encoding: "utf8" });
+    git("init", "-q");
+    mkdirSync(join(repo, "src", "deep"), { recursive: true });
+    try {
+      openRounds(repo, agent, DIFF).save({ verdict: "request_changes", viewed: ["src/a.ts"] });
+      // The hook passes its own cwd, which can be any directory of the repo.
+      const fromSub = openRounds(join(repo, "src", "deep"), agent, DIFF);
+      expect(fromSub.info?.number).toBe(2);
+      expect(fromSub.info?.viewedPaths).toEqual(["src/a.ts"]);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
+  });
+});
+
+test("openRounds: a directory that is no repository still gets its own chain", () => {
+  withStateDir(() => {
+    const plain = mkdtempSync(join(tmpdir(), "rb-plain-"));
+    try {
+      openRounds(plain, agent, DIFF).save({ verdict: "request_changes", viewed: ["src/a.ts"] });
+      expect(openRounds(plain, agent, DIFF).info?.number).toBe(2);
+    } finally {
+      rmSync(plain, { recursive: true, force: true });
+    }
   });
 });
 

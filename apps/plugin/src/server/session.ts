@@ -16,6 +16,7 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { parseDiff } from "@review-buddy/core/diff";
 import { buildMeta } from "@review-buddy/core/meta";
+import { repoToplevel } from "@review-buddy/core/node/git";
 import { localGitSource } from "@review-buddy/core/node/local-source";
 import { resolveReview } from "@review-buddy/core/resolve";
 import { fileFingerprints, nextRoundState, roundInfo } from "@review-buddy/core/rounds";
@@ -70,7 +71,10 @@ export function openRounds(
   agent: AgentReview,
   diff: string,
 ): { info?: RoundInfo; save: (result: DoneResult) => void } {
-  const store = roundStore(cwd, agent.source);
+  // Keyed by the repository, not by where the agent happened to run: the hook
+  // passes its own cwd, so two directories of one repo would otherwise be two
+  // chains and a re-review from a subdirectory would start over at round 1.
+  const store = roundStore(repoToplevel(cwd) ?? cwd, agent.source);
   cleanupRounds();
   const previous = store.read();
   const current = fileFingerprints(parseDiff(diff));
