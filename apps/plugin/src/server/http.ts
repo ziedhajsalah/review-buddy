@@ -14,9 +14,9 @@ import { createHash, timingSafeEqual } from "node:crypto";
 import { existsSync } from "node:fs";
 import { join, resolve, sep } from "node:path";
 import { languageOf } from "@review-buddy/core/diff";
+import { answeredFindings } from "@review-buddy/core/messages";
 import { allowedPaths } from "@review-buddy/core/resolve";
 import type { ReviewDataSource } from "@review-buddy/core/source";
-import { answeredFindings } from "@review-buddy/core/messages";
 import type {
   AnsweredFinding,
   ResolvedReview,
