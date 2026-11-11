@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync, rmSync, statSync, utimesSync } from "node:fs
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { RoundState } from "@review-buddy/core/rounds";
-import { cleanupRounds, roundKey, roundsDir, roundStore } from "./round-store.ts";
+import { cleanupRounds, roundKey, roundStore, roundsDir } from "./round-store.ts";
 
 let dir: string;
 let env: NodeJS.ProcessEnv;

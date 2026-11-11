@@ -42,6 +42,13 @@ export interface ServerContext {
   uiDir?: string;
   /** Show the verdict UI (approve / request changes), via /api/config. */
   roundtrip?: boolean;
+  /**
+   * Called once with what the reviewer sent, before `done` resolves — how the
+   * round store records this round (session.ts). Keeping it a callback leaves
+   * this module transport-only: it never touches the filesystem itself. It
+   * must not throw; a failure here may not cost the review.
+   */
+  onDone?: (result: DoneResult) => void;
 }
 
 /** What the viewer sent (validated), or how the server stopped. No verdict ⇒ approve. */
@@ -184,6 +191,13 @@ export function startServer(ctx: ServerContext): RunningServer {
           ...parsed.value,
           ...(answered.length > 0 ? { answered } : {}),
         };
+        try {
+          ctx.onDone?.(body);
+        } catch (e) {
+          // The reviewer is finished either way: losing the round memory is
+          // not a reason to refuse their verdict.
+          console.error(`[review-buddy] could not record this round (${String(e)}).`);
+        }
         // Resolve on the next tick so THIS response flushes to the client
         // before the hook tears the server down (otherwise the client sees an
         // empty reply / connection reset).

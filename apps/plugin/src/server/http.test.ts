@@ -7,7 +7,7 @@ import { captureDiff, capturePr, fileContent, resolveBase } from "@review-buddy/
 import { localGitSource } from "@review-buddy/core/node/local-source";
 import { resolveReview } from "@review-buddy/core/resolve";
 import type { AgentReview, PrMetadata, ResolvedReview, ReviewMeta } from "@review-buddy/core/types";
-import { type RunningServer, startServer } from "./http.ts";
+import { type DoneResult, type RunningServer, startServer } from "./http.ts";
 
 let dir: string;
 let server: RunningServer;
@@ -343,6 +343,88 @@ describe("HTTP server", () => {
     } finally {
       s.stop();
     }
+  });
+
+  test("POST /api/done hands what the reviewer sent to onDone, before done resolves", async () => {
+    const seen: DoneResult[] = [];
+    const s = startServer({
+      review,
+      cwd: dir,
+      source: localGitSource(dir),
+      onDone: (r) => seen.push(r),
+    });
+    try {
+      const res = await fetch(`http://127.0.0.1:${s.port}/api/done`, {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-review-buddy-token": s.token },
+        body: JSON.stringify({ verdict: "request_changes", viewed: ["app.ts"] }),
+      });
+      expect(res.status).toBe(200);
+      // Called by the time the response is out, so the round is recorded
+      // before the hook tears the server down.
+      expect(seen).toHaveLength(1);
+      expect(seen[0]).toMatchObject({ verdict: "request_changes", viewed: ["app.ts"] });
+      expect((await s.done).verdict).toBe("request_changes");
+    } finally {
+      s.stop();
+    }
+  });
+
+  test("POST /api/done: a malformed viewed list refuses the body, and records nothing", async () => {
+    let calls = 0;
+    const s = startServer({
+      review,
+      cwd: dir,
+      source: localGitSource(dir),
+      onDone: () => calls++,
+    });
+    try {
+      const res = await fetch(`http://127.0.0.1:${s.port}/api/done`, {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-review-buddy-token": s.token },
+        body: JSON.stringify({ verdict: "request_changes", viewed: ["app.ts", 7] }),
+      });
+      expect(res.status).toBe(400);
+      expect(await res.json()).toMatchObject({ error: expect.stringContaining("viewed") });
+      expect(calls).toBe(0);
+    } finally {
+      s.stop();
+    }
+  });
+
+  test("POST /api/done: an onDone that throws does not cost the reviewer their verdict", async () => {
+    const s = startServer({
+      review,
+      cwd: dir,
+      source: localGitSource(dir),
+      onDone: () => {
+        throw new Error("state folder is read-only");
+      },
+    });
+    try {
+      const res = await fetch(`http://127.0.0.1:${s.port}/api/done`, {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-review-buddy-token": s.token },
+        body: JSON.stringify({ verdict: "approve", summary: "good" }),
+      });
+      expect(res.status).toBe(200);
+      expect((await s.done).summary).toBe("good");
+    } finally {
+      s.stop();
+    }
+  });
+
+  test("the server never calls onDone when it is stopped instead of finished", async () => {
+    let calls = 0;
+    const s = startServer({
+      review,
+      cwd: dir,
+      source: localGitSource(dir),
+      onDone: () => calls++,
+    });
+    s.stop();
+    expect((await s.done).superseded).toBe(true);
+    expect(calls).toBe(0);
   });
 
   test("POST /api/done rejects an oversized body (content-length guard)", async () => {
